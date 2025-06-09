@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: cjs-discord-bot
+    env: node
+    plan: free
+    branch: main
+    buildCommand: npm install
+    startCommand: node bot.js
+    autoDeploy: true
+    envVars:
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: STELLAR_SECRET
+        sync: false
+      - key: FIREBASE_CONFIG
+        sync: false
+      - key: GOOGLE_PAY_API_KEY
+        sync: false
+      - key: CJS_ASSET_ISSUER
+        sync: false
+      - key: CJS_ASSET_CODE
+        sync: false
+        
