@@ -1,19 +1,21 @@
-import os
 import discord
-from discord.ext import commands
-from dotenv import load_dotenv
+import os
 
-load_dotenv()  # Loads variables from .env
+intents = discord.Intents.default()
+intents.message_content = True  # Make sure this is enabled on the bot page too
 
-TOKEN = os.getenv("DISCORD_TOKEN")
-bot = commands.Bot(command_prefix="!")
+client = discord.Client(intents=intents)
 
-@bot.event
+@client.event
 async def on_ready():
-    print(f"Logged in as {bot.user}")
+    print(f'We have logged in as {client.user}')
 
-@bot.command()
-async def ping(ctx):
-    await ctx.send("Pong!")
+@client.event
+async def on_message(message):
+    if message.author == client.user:
+        return
 
-bot.run(TOKEN)
+    if message.content.startswith('!hello'):
+        await message.channel.send('Hello! 👋')
+
+client.run(os.getenv("DISCORD_TOKEN"))
