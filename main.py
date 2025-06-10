@@ -14,6 +14,14 @@ async def on_ready():
     except Exception as e:
         print(f"Sync error: {e}")
 
+wallets = {}
+
+@bot.tree.command(name="registerwallet")
+async def registerwallet(interaction: discord.Interaction, wallet: str):
+    wallets[interaction.user.id] = wallet
+    await interaction.response.send_message(f"Wallet `{wallet}` registered.", ephemeral=True)
+    
+
 @bot.tree.command(name="buycjs", description="Buy a specific amount of CJS tokens")
 async def buycjs(interaction: discord.Interaction, amount: float):
     user_id = interaction.user.id
