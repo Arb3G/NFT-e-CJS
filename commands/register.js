@@ -1,62 +1,45 @@
 // commands/register.js
-const express = require('express');
-const router = express.Router();
+const { SlashCommandBuilder } = require('discord.js');
 const { getUser, addUser } = require('../services/db');
 
-router.post('/', async (req, res) => {
-  const { userId, step, answer, publicKey } = req.body;
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName('register')
+    .setDescription('Register your wallet to use the bot')
+    .addStringOption(option =>
+      option.setName('publickey')
+        .setDescription('Your Stellar wallet public key')
+        .setRequired(true)
+    ),
 
-  console.log("📥 /register hit with:", req.body);
+  async execute(interaction) {
+    const userId = interaction.user.id;
+    const publicKey = interaction.options.getString('publickey');
 
-  if (!userId) {
-    return res.status(400).json({ error: "userId is required." });
-  }
-
-  // Step: Confirm registration
-  if (step === 'confirm') {
+    // Check if user already registered
     try {
-      const user = await getUser(userId);
-      if (user) {
-        return res.status(200).json({
-          registered: true,
-          message: "Great! You're ready to make a purchase. Submit your userId and amount to /buycjs."
-        });
-      } else {
-        return res.status(200).json({
-          registered: false,
-          message: "User not found. Please register."
+      const existingUser = await getUser(userId);
+
+      if (existingUser) {
+        return interaction.reply({
+          content: '✅ You are already registered.',
+          ephemeral: true,
         });
       }
-    } catch (error) {
-      console.error("❌ Error checking registration:", error);
-      return res.status(500).json({ error: "Failed to check registration." });
-    }
-  }
 
-  // Step: Register user
-  if (step === 'register') {
-    if (!publicKey) {
-      return res.status(400).json({ error: "publicKey is required." });
-    }
-
-    console.log("🔧 Attempting to register user:", { userId, publicKey });
-
-    try {
+      // Register the new user
       await addUser(userId, publicKey);
-      console.log("✅ Successfully registered:", { userId });
 
-      return res.status(200).json({
-        message: "Registration complete.",
-        user: { userId, publicKey }
+      return interaction.reply({
+        content: `🎉 Registration complete! Your wallet \`${publicKey}\` is now linked.`,
+        ephemeral: true,
       });
     } catch (error) {
-      console.error("❌ Registration failed:", error);
-      return res.status(500).json({ error: "Failed to register user." });
+      console.error('❌ Registration failed:', error);
+      return interaction.reply({
+        content: '⚠️ Something went wrong while registering.',
+        ephemeral: true,
+      });
     }
   }
-
-  // Unknown step
-  return res.status(400).json({ error: "Invalid step." });
-});
-
-module.exports = router;
+};
