@@ -1,1 +1,22 @@
+{
+  "name": "discord-art-generator-bot",
+  "version": "1.0.0",
+  "description": "A Discord bot that generates AI art with token gating and NFT minting",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "deploy-commands": "node deploy-commands.js"
+  },
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.11.0",
+    "node-fetch": "^2.6.12",
+    "stellar-sdk": "^10.4.0",
+    "@supabase/supabase-js": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
 
