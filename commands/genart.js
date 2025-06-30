@@ -24,9 +24,10 @@ module.exports = {
   async execute(interaction) {
     const userId = interaction.options.getString('userid');
 
-    // Defer reply to allow time
+    // Acknowledge command to avoid timeout
     await interaction.deferReply({ ephemeral: true });
 
+    // Build Yes/No buttons
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('yes_registered')
@@ -38,6 +39,7 @@ module.exports = {
         .setStyle(ButtonStyle.Secondary)
     );
 
+    // Send intro message with buttons
     await interaction.editReply({
       content:
         `👋🏾 Welcome to the **CJS Art Engine** — where your imagination meets the blockchain.\n\n` +
@@ -50,6 +52,7 @@ module.exports = {
       components: [row],
     });
 
+    // Collect button clicks
     const collector = interaction.channel.createMessageComponentCollector({
       time: 60000,
       filter: i => i.user.id === interaction.user.id,
@@ -57,41 +60,45 @@ module.exports = {
 
     collector.on('collect', async i => {
       if (i.customId === 'yes_registered') {
+        await i.deferReply({ ephemeral: true });
+
         const user = await getUser(userId);
 
         if (!user) {
-          await i.reply({
-            content: `❗ We couldn’t find a wallet linked to your ID: \`${userId}\`\nPlease send your **Stellar public key** to register.`,
-            ephemeral: true,
+          await i.editReply({
+            content: `❗ No wallet found for ID \`${userId}\`. Please send your **Stellar public key** to register.`,
+          });
+          collector.stop();
+          return;
+        }
+
+        const balance = await checkTokenBalance(user.public_key);
+        if (balance < 10) {
+          await i.editReply({
+            content:
+              `💸 You need at least **10 $CJS** in your wallet.\n` +
+              `Current balance: **${balance}**\n` +
+              `Top up here: [https://yourdomain.com/buycjs](#)`,
           });
         } else {
-          const balance = await checkTokenBalance(user.public_key);
-          if (balance < 10) {
-            await i.reply({
-              content:
-                `💸 You need at least **10 $CJS** to generate art.\n` +
-                `Current balance: **${balance}**\n` +
-                `Top up at: [https://yourdomain.com/buycjs](#)`,
-              ephemeral: true,
-            });
-          } else {
-            await i.reply({
-              content:
-                `✅ You're verified with enough tokens!\n` +
-                `Please describe your art idea (e.g., *“A futuristic Black utopia on Mars”*).`,
-              ephemeral: true,
-            });
-            // Setup another collector for art prompt if needed
-          }
+          await i.editReply({
+            content:
+              `✅ You're verified and funded!\n🎨 Please describe your art idea (e.g., *“A futuristic Black utopia on Mars”*).`,
+          });
+          // Future: Start collector for prompt
         }
+
         collector.stop();
       }
 
       if (i.customId === 'no_not_registered') {
-        await i.reply({
-          content: `Let's get you registered. Please reply with your **Stellar public key**.`,
-          ephemeral: true,
+        await i.deferReply({ ephemeral: true });
+
+        await i.editReply({
+          content:
+            `No problem! Please send your **Stellar public key** (e.g., GABC...1234) to link your wallet to ID \`${userId}\`.`,
         });
+
         collector.stop();
       }
     });
@@ -99,7 +106,7 @@ module.exports = {
     collector.on('end', collected => {
       if (collected.size === 0) {
         interaction.followUp({
-          content: `⏰ You took too long. Please run \`/genart\` again.`,
+          content: `⏰ You took too long to respond. Please run \`/genart\` again.`,
           ephemeral: true,
         });
       }
