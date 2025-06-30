@@ -11,8 +11,8 @@ module.exports = {
   async execute(interaction) {
     console.log(`[genart] Command triggered by ${interaction.user.tag}`);
 
-    // Defer reply to acknowledge interaction and allow more time
-    await interaction.deferReply({ ephemeral: true });
+    // Defer reply with ephemeral flag (64)
+    await interaction.deferReply({ flags: 64 });
 
     // Create Yes / No buttons for registration question
     const row = new ActionRowBuilder().addComponents(
@@ -26,7 +26,7 @@ module.exports = {
         .setStyle(ButtonStyle.Danger)
     );
 
-    // Send the prompt with buttons
+    // Edit the deferred reply to add message content and buttons
     await interaction.editReply({
       content:
         `👋🏾 Welcome to the **CJS Art Engine** — where your imagination meets the blockchain.\n\n` +
@@ -37,14 +37,15 @@ module.exports = {
         `- It ensures we can later offer you the option to mint your art as an **NFT**!\n\n` +
         `👉 Please click **Yes** or **No** below to confirm your registration status.`,
       components: [row],
+      flags: 64,
     });
 
-    // Filter for buttons: only from the original user, and only for genart_yes or genart_no
+    // Filter to only allow interaction from the original user, and only our buttons
     const filter = (btnInteraction) =>
       ['genart_yes', 'genart_no'].includes(btnInteraction.customId) &&
       btnInteraction.user.id === interaction.user.id;
 
-    // Create a collector for button interactions, max 1 response, timeout 60 seconds
+    // Collector for button clicks - max 1, 60 seconds timeout
     const collector = interaction.channel.createMessageComponentCollector({
       filter,
       max: 1,
@@ -53,9 +54,8 @@ module.exports = {
 
     collector.on('collect', async (btnInteraction) => {
       if (btnInteraction.customId === 'genart_yes') {
-        await btnInteraction.update({ content: 'Great! Checking your registration...', components: [] });
+        await btnInteraction.update({ content: 'Great! Checking your registration...', components: [], flags: 64 });
 
-        // Check user registration and token balance
         try {
           const user = await getUser(btnInteraction.user.id);
           if (!user) {
@@ -88,7 +88,7 @@ module.exports = {
             ephemeral: true,
           });
 
-          // TODO: Add next step to collect art description here
+          // TODO: Add your next step here (collect art description)
 
         } catch (error) {
           console.error('[genart] Error during registration/token check:', error);
@@ -101,14 +101,14 @@ module.exports = {
         await btnInteraction.update({
           content: 'No problem! Please send your **Stellar public key** so we can link your wallet.',
           components: [],
-          ephemeral: true,
+          flags: 64,
         });
       }
     });
 
     collector.on('end', (collected) => {
       if (collected.size === 0) {
-        interaction.editReply({ content: 'You did not respond in time. Please run the command again.', components: [] });
+        interaction.editReply({ content: 'You did not respond in time. Please run the command again.', components: [], flags: 64 });
       }
     });
   },
