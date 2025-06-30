@@ -9,8 +9,8 @@ const {
 } = require('discord.js');
 
 const { getUser } = require('../services/db');
-const checkTokenBalance = require('../services/tokenCheck');
-
+//const checkTokenBalance = require('../services/tokenCheck');
+const { checkCJSBalance } = require('../services/tokenCheck');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('genart')
@@ -72,7 +72,9 @@ module.exports = {
           return;
         }
 
-        const balance = await checkTokenBalance(user.public_key);
+      //  const balance = await checkCJSBalance(user.public_key);
+        const balance = await checkCJSBalance(user.public_key);
+
         if (balance < 10) {
           await i.editReply({
             content:
