@@ -1,3 +1,4 @@
+//genart
 const { SlashCommandBuilder } = require('discord.js');
 const { getUser } = require('../services/db');
 const checkTokenBalance = require('../services/tokenCheck');
@@ -15,9 +16,11 @@ module.exports = {
   async execute(interaction) {
     const userId = interaction.options.getString('userid');
 
-    // Defer reply to have more time and make reply ephemeral
+    // Defer the reply immediately to acknowledge the command and allow more time
+    // This is required because we will do multiple follow-up messages
     await interaction.deferReply({ ephemeral: true });
 
+    // Initial welcome and registration prompt sent as a follow-up message
     await interaction.followUp(
       `👋🏾 Welcome to the **CJS Art Engine** — where your imagination meets the blockchain.\n\n` +
       `**Are you already registered with your Stellar wallet?**\n\n` +
@@ -28,27 +31,33 @@ module.exports = {
       `👉 Please reply with **Yes** or **No** to confirm your registration status.`
     );
 
+    // Filter to accept only messages from the command user that are "yes" or "no"
     const filter = response =>
       response.author.id === interaction.user.id &&
       ['yes', 'no'].includes(response.content.toLowerCase());
 
+    // Create a message collector on the interaction channel to collect user replies for 60 seconds
     const collector = interaction.channel.createMessageCollector({ filter, time: 60000 });
 
     collector.on('collect', async (message) => {
       const reply = message.content.toLowerCase();
 
       if (reply === 'yes') {
+        // User claims to be registered, so check registration in database
         const user = await getUser(userId);
+
         if (!user) {
+          // No wallet linked to this Discord ID
           await interaction.followUp({
             content: `❗ We couldn’t find your wallet linked to this Discord ID.\n` +
               `Please send your **Stellar public key** (e.g., GABC...1234) to register.`,
             ephemeral: true,
           });
-          collector.stop();
+          collector.stop(); // Stop collecting after response
           return;
         }
 
+        // Check if user has enough tokens (>=10 CJS)
         const balance = await checkTokenBalance(user.public_key);
         if (balance < 10) {
           await interaction.followUp({
@@ -62,14 +71,17 @@ module.exports = {
           return;
         }
 
+        // User is registered and has enough tokens
         await interaction.followUp({
           content: `🧠 Registration confirmed!\n🎨 You have enough **$CJS** tokens to create art!\n` +
             `Please type the description of the art you want to create (e.g., *“A futuristic Black city on Mars”*).`,
           ephemeral: true,
         });
 
+        // Here you might want to set up another collector for the art description
         collector.stop();
       } else if (reply === 'no') {
+        // User is not registered, prompt for Stellar public key to register
         await interaction.followUp({
           content: `No worries! Let’s get you registered.\n` +
             `Please send your **Stellar public key** (e.g., GABC...1234) to link your wallet.`,
@@ -80,6 +92,7 @@ module.exports = {
     });
 
     collector.on('end', collected => {
+      // If user did not respond within the time limit
       if (collected.size === 0) {
         interaction.followUp({
           content: '❗ You took too long to respond. Please run the command again and reply with "Yes" or "No".',
