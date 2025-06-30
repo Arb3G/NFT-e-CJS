@@ -19,10 +19,7 @@
   "engines": {
     "node": ">=18.0.0"
   },
-<<<<<<< HEAD
   "devDependencies": {},
   "keywords": []
-=======
-  "type": "module"
->>>>>>> a5dfa212d4987bce51655ca9461ae11000b8c7af
 }
+
