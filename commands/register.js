@@ -2,44 +2,61 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { getUser, addUser } = require('../services/db');
 
+function isValidStellarPublicKey(key) {
+  return /^G[A-Z2-7]{55}$/.test(key);
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('register')
-    .setDescription('Register your wallet to use the bot')
+    .setDescription('Link your Stellar wallet to your Discord account')
     .addStringOption(option =>
-      option.setName('publickey')
-        .setDescription('Your Stellar wallet public key')
+      option
+        .setName('publickey')
+        .setDescription('Your Stellar public key (G...)')
         .setRequired(true)
     ),
 
   async execute(interaction) {
-    const userId = interaction.user.id;
     const publicKey = interaction.options.getString('publickey');
+    const discordId = interaction.user.id;
 
-    // Check if user already registered
-    try {
-      const existingUser = await getUser(userId);
-
-      if (existingUser) {
-        return interaction.reply({
-          content: '✅ You are already registered.',
-          ephemeral: true,
-        });
-      }
-
-      // Register the new user
-      await addUser(userId, publicKey);
-
+    if (!isValidStellarPublicKey(publicKey)) {
       return interaction.reply({
-        content: `🎉 Registration complete! Your wallet \`${publicKey}\` is now linked.`,
-        ephemeral: true,
-      });
-    } catch (error) {
-      console.error('❌ Registration failed:', error);
-      return interaction.reply({
-        content: '⚠️ Something went wrong while registering.',
+        content: '❌ That does not look like a valid Stellar public key. Please check and try again.',
         ephemeral: true,
       });
     }
-  }
+
+    try {
+      const existingUser = await getUser(discordId);
+
+      if (existingUser) {
+        if (existingUser.public_key !== publicKey) {
+          await addUser(discordId, publicKey);
+          return interaction.reply({
+            content: '✅ Your Stellar public key was updated successfully!',
+            ephemeral: true,
+          });
+        } else {
+          return interaction.reply({
+            content: 'ℹ️ Your Stellar public key is already registered.',
+            ephemeral: true,
+          });
+        }
+      } else {
+        await addUser(discordId, publicKey);
+        return interaction.reply({
+          content: '✅ Successfully linked your Stellar wallet to your Discord account!',
+          ephemeral: true,
+        });
+      }
+    } catch (error) {
+      console.error('[register] DB error:', error);
+      return interaction.reply({
+        content: '⚠️ Sorry, something went wrong while saving your information. Please try again later.',
+        ephemeral: true,
+      });
+    }
+  },
 };
