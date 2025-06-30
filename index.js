@@ -39,3 +39,4 @@ for (const file of eventFiles) {
 }
 
 client.login(process.env.DISCORD_TOKEN);
+export CJS_ASSET_CODE=CJS
