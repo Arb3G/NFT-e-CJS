@@ -8,9 +8,16 @@ const {
   ButtonStyle,
 } = require('discord.js');
 
+const QRCode = require('qrcode');
+
 const { getUser } = require('../services/db');
-//const checkTokenBalance = require('../services/tokenCheck');
 const { checkCJSBalance } = require('../services/tokenCheck');
+const { waitForPayment } = require('../services/paymentMonitor');
+
+const TREASURY_PUBLIC_KEY = 'G...YOUR_TREASURY_ACCOUNT_PUBLIC_KEY';
+const CJS_ISSUER_PUBLIC_KEY = 'G...YOUR_CJS_ISSUER_PUBLIC_KEY';
+const PAYMENT_AMOUNT = '10';
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('genart')
@@ -24,10 +31,8 @@ module.exports = {
   async execute(interaction) {
     const userId = interaction.options.getString('userid');
 
-    // Acknowledge command to avoid timeout
     await interaction.deferReply({ ephemeral: true });
 
-    // Build Yes/No buttons
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('yes_registered')
@@ -39,7 +44,6 @@ module.exports = {
         .setStyle(ButtonStyle.Secondary)
     );
 
-    // Send intro message with buttons
     await interaction.editReply({
       content:
         `👋🏾 Welcome to the **CJS Art Engine** — where your imagination meets the blockchain.\n\n` +
@@ -52,7 +56,6 @@ module.exports = {
       components: [row],
     });
 
-    // Collect button clicks
     const collector = interaction.channel.createMessageComponentCollector({
       time: 60000,
       filter: i => i.user.id === interaction.user.id,
@@ -72,7 +75,6 @@ module.exports = {
           return;
         }
 
-      //  const balance = await checkCJSBalance(user.public_key);
         const balance = await checkCJSBalance(user.public_key);
 
         if (balance < 10) {
@@ -82,13 +84,47 @@ module.exports = {
               `Current balance: **${balance}**\n` +
               `Top up here: [https://yourdomain.com/buycjs](#)`,
           });
-        } else {
-          await i.editReply({
-            content:
-              `✅ You're verified and funded!\n🎨 Please describe your art idea (e.g., *“A futuristic Black utopia on Mars”*).`,
-          });
-          // Future: Start collector for prompt
+          collector.stop();
+          return;
         }
+
+        // Generate Stellar payment URI with memo for tracking
+        const memo = `genart-${userId}`;
+        const paymentURI = `web+stellar:pay?destination=${TREASURY_PUBLIC_KEY}` +
+          `&amount=${PAYMENT_AMOUNT}` +
+          `&asset_code=CJS` +
+          `&asset_issuer=${CJS_ISSUER_PUBLIC_KEY}` +
+          `&memo=${encodeURIComponent(memo)}`;
+
+        // Generate QR code image data URL from payment URI
+        const qrCodeDataUrl = await QRCode.toDataURL(paymentURI);
+
+        // Send payment request with QR code and link
+        await i.editReply({
+          content:
+            `✅ You're verified and funded!\n\n` +
+            `🧾 Please send **${PAYMENT_AMOUNT} $CJS** to proceed by scanning the QR code or clicking the link below:\n` +
+            `${paymentURI}\n\n` +
+            `We'll wait up to 90 seconds for payment confirmation...`,
+          files: [{ attachment: qrCodeDataUrl, name: 'payment-qr.png' }],
+        });
+
+        // Wait for payment confirmation
+        const confirmed = await waitForPayment(user.public_key, PAYMENT_AMOUNT, memo, 90000); // 90 seconds timeout
+
+        if (!confirmed) {
+          await i.followUp({
+            content: `❌ Payment not detected within 90 seconds. Please rerun the command once complete.`,
+            ephemeral: true,
+          });
+          collector.stop();
+          return;
+        }
+
+        await i.followUp({
+          content: `🎨 Payment received! Please describe your art idea (e.g., *“A futuristic Black utopia on Mars”*).`,
+          ephemeral: true,
+        });
 
         collector.stop();
       }
