@@ -1,4 +1,5 @@
 //genart
+// commands/genart.js
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getUser } = require('../services/db');
 const checkTokenBalance = require('../services/tokenCheck');
@@ -9,24 +10,24 @@ module.exports = {
     .setDescription('Generate AI art using your $CJS tokens'),
 
   async execute(interaction) {
-    console.log(`[genart] Command triggered by ${interaction.user.tag}`);
+    const discordId = interaction.user.id;
 
-    // Defer reply with ephemeral flag (64)
-    await interaction.deferReply({ flags: 64 });
+    // Defer reply so we can show ephemeral follow-ups
+    await interaction.deferReply({ ephemeral: true });
 
-    // Create Yes / No buttons for registration question
+    // Create the Yes/No button row
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setCustomId('genart_yes')
+        .setCustomId('yes_registered')
         .setLabel('Yes')
         .setStyle(ButtonStyle.Success),
       new ButtonBuilder()
-        .setCustomId('genart_no')
+        .setCustomId('no_not_registered')
         .setLabel('No')
-        .setStyle(ButtonStyle.Danger)
+        .setStyle(ButtonStyle.Secondary)
     );
 
-    // Edit the deferred reply to add message content and buttons
+    // Initial onboarding message
     await interaction.editReply({
       content:
         `👋🏾 Welcome to the **CJS Art Engine** — where your imagination meets the blockchain.\n\n` +
@@ -35,80 +36,59 @@ module.exports = {
         `- We need to link your Discord account to your Stellar wallet.\n` +
         `- This lets us verify your **$CJS token balance** (10 $CJS required to generate art).\n` +
         `- It ensures we can later offer you the option to mint your art as an **NFT**!\n\n` +
-        `👉 Please click **Yes** or **No** below to confirm your registration status.`,
+        `👉 Please click **Yes** or **No** below.`,
       components: [row],
-      flags: 64,
     });
 
-    // Filter to only allow interaction from the original user, and only our buttons
-    const filter = (btnInteraction) =>
-      ['genart_yes', 'genart_no'].includes(btnInteraction.customId) &&
-      btnInteraction.user.id === interaction.user.id;
-
-    // Collector for button clicks - max 1, 60 seconds timeout
+    // Set up a component collector for the buttons
     const collector = interaction.channel.createMessageComponentCollector({
-      filter,
-      max: 1,
       time: 60000,
+      filter: i => i.user.id === discordId,
     });
 
-    collector.on('collect', async (btnInteraction) => {
-      if (btnInteraction.customId === 'genart_yes') {
-        await btnInteraction.update({ content: 'Great! Checking your registration...', components: [], flags: 64 });
+    collector.on('collect', async i => {
+      if (i.customId === 'yes_registered') {
+        const user = await getUser(discordId);
 
-        try {
-          const user = await getUser(btnInteraction.user.id);
-          if (!user) {
-            await btnInteraction.followUp({
-              content:
-                '❗ We couldn’t find your wallet linked to this Discord ID.\n' +
-                'Please send your **Stellar public key** (e.g., GABC...1234) to register.',
-              ephemeral: true,
-            });
-            return;
-          }
-
+        if (!user) {
+          await i.reply({
+            content: `❗ We couldn’t find your wallet linked to this Discord ID.\n\nPlease send your **Stellar public key** (e.g., GABC...1234) to get started.`,
+            ephemeral: true,
+          });
+        } else {
           const balance = await checkTokenBalance(user.public_key);
           if (balance < 10) {
-            await btnInteraction.followUp({
-              content:
-                `💸 You need at least **10 $CJS** tokens to generate art.\n` +
-                `Your current balance is **${balance}**.\n` +
-                `Please top up here: [https://yourdomain.com/buycjs](#)\n` +
-                `Once topped up, run \`/genart\` again.`,
+            await i.reply({
+              content: `💸 You need at least **10 $CJS** to generate art.\nYour current balance is **${balance}**.\nTop up here: [https://yourdomain.com/buycjs](#)`,
               ephemeral: true,
             });
-            return;
+          } else {
+            await i.reply({
+              content: `🧠 Registration confirmed!\n🎨 You have enough **$CJS** tokens to create art!\nPlease type your art prompt (e.g., *“A futuristic Black city on Mars”*).`,
+              ephemeral: true,
+            });
+
+            // You can add another collector here to get the art description if needed
           }
-
-          await btnInteraction.followUp({
-            content:
-              '🧠 Registration confirmed! 🎨 You have enough **$CJS** tokens to create art!\n' +
-              'Please type the description of the art you want to create (e.g., "A futuristic Black city on Mars").',
-            ephemeral: true,
-          });
-
-          // TODO: Add your next step here (collect art description)
-
-        } catch (error) {
-          console.error('[genart] Error during registration/token check:', error);
-          await btnInteraction.followUp({
-            content: '⚠️ Sorry, something went wrong checking your registration. Please try again later.',
-            ephemeral: true,
-          });
         }
-      } else if (btnInteraction.customId === 'genart_no') {
-        await btnInteraction.update({
-          content: 'No problem! Please send your **Stellar public key** so we can link your wallet.',
-          components: [],
-          flags: 64,
+        collector.stop();
+      }
+
+      if (i.customId === 'no_not_registered') {
+        await i.reply({
+          content: `No worries! Let’s get you registered.\nPlease send your **Stellar public key** (e.g., GABC...1234) so we can link your wallet.`,
+          ephemeral: true,
         });
+        collector.stop();
       }
     });
 
-    collector.on('end', (collected) => {
+    collector.on('end', collected => {
       if (collected.size === 0) {
-        interaction.editReply({ content: 'You did not respond in time. Please run the command again.', components: [], flags: 64 });
+        interaction.followUp({
+          content: '❗ You took too long to respond. Please run the command again.',
+          ephemeral: true,
+        });
       }
     });
   },
