@@ -1,21 +1,32 @@
 //genart
 // commands/genart.js
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+// commands/genart.js
+const {
+  SlashCommandBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+} = require('discord.js');
+
 const { getUser } = require('../services/db');
 const checkTokenBalance = require('../services/tokenCheck');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('genart')
-    .setDescription('Generate AI art using your $CJS tokens'),
+    .setDescription('Generate AI art using your $CJS tokens')
+    .addStringOption(option =>
+      option.setName('userid')
+        .setDescription('Your CJS User ID (NOT Discord ID)')
+        .setRequired(true)
+    ),
 
   async execute(interaction) {
-    const discordId = interaction.user.id;
+    const userId = interaction.options.getString('userid');
 
-    // Defer reply so we can show ephemeral follow-ups
+    // Defer reply to allow time
     await interaction.deferReply({ ephemeral: true });
 
-    // Create the Yes/No button row
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('yes_registered')
@@ -27,48 +38,50 @@ module.exports = {
         .setStyle(ButtonStyle.Secondary)
     );
 
-    // Initial onboarding message
     await interaction.editReply({
       content:
         `👋🏾 Welcome to the **CJS Art Engine** — where your imagination meets the blockchain.\n\n` +
-        `**Are you already registered with your Stellar wallet?**\n\n` +
+        `**Are you already registered with your Stellar wallet using the user ID: \`${userId}\`?**\n\n` +
         `**Why is registration important?**\n` +
-        `- We need to link your Discord account to your Stellar wallet.\n` +
+        `- We link your CJS User ID to your Stellar wallet.\n` +
         `- This lets us verify your **$CJS token balance** (10 $CJS required to generate art).\n` +
         `- It ensures we can later offer you the option to mint your art as an **NFT**!\n\n` +
-        `👉 Please click **Yes** or **No** below.`,
+        `👉 Please click **Yes** if you're registered, or **No** to register your Stellar wallet.`,
       components: [row],
     });
 
-    // Set up a component collector for the buttons
     const collector = interaction.channel.createMessageComponentCollector({
       time: 60000,
-      filter: i => i.user.id === discordId,
+      filter: i => i.user.id === interaction.user.id,
     });
 
     collector.on('collect', async i => {
       if (i.customId === 'yes_registered') {
-        const user = await getUser(discordId);
+        const user = await getUser(userId);
 
         if (!user) {
           await i.reply({
-            content: `❗ We couldn’t find your wallet linked to this Discord ID.\n\nPlease send your **Stellar public key** (e.g., GABC...1234) to get started.`,
+            content: `❗ We couldn’t find a wallet linked to your ID: \`${userId}\`\nPlease send your **Stellar public key** to register.`,
             ephemeral: true,
           });
         } else {
           const balance = await checkTokenBalance(user.public_key);
           if (balance < 10) {
             await i.reply({
-              content: `💸 You need at least **10 $CJS** to generate art.\nYour current balance is **${balance}**.\nTop up here: [https://yourdomain.com/buycjs](#)`,
+              content:
+                `💸 You need at least **10 $CJS** to generate art.\n` +
+                `Current balance: **${balance}**\n` +
+                `Top up at: [https://yourdomain.com/buycjs](#)`,
               ephemeral: true,
             });
           } else {
             await i.reply({
-              content: `🧠 Registration confirmed!\n🎨 You have enough **$CJS** tokens to create art!\nPlease type your art prompt (e.g., *“A futuristic Black city on Mars”*).`,
+              content:
+                `✅ You're verified with enough tokens!\n` +
+                `Please describe your art idea (e.g., *“A futuristic Black utopia on Mars”*).`,
               ephemeral: true,
             });
-
-            // You can add another collector here to get the art description if needed
+            // Setup another collector for art prompt if needed
           }
         }
         collector.stop();
@@ -76,7 +89,7 @@ module.exports = {
 
       if (i.customId === 'no_not_registered') {
         await i.reply({
-          content: `No worries! Let’s get you registered.\nPlease send your **Stellar public key** (e.g., GABC...1234) so we can link your wallet.`,
+          content: `Let's get you registered. Please reply with your **Stellar public key**.`,
           ephemeral: true,
         });
         collector.stop();
@@ -86,7 +99,7 @@ module.exports = {
     collector.on('end', collected => {
       if (collected.size === 0) {
         interaction.followUp({
-          content: '❗ You took too long to respond. Please run the command again.',
+          content: `⏰ You took too long. Please run \`/genart\` again.`,
           ephemeral: true,
         });
       }
