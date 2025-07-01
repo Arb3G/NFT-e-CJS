@@ -3,6 +3,7 @@
 const { Server } = require('stellar-sdk');
 const server = new Server('https://horizon.stellar.org');
 
+
 const CJS_ASSET_CODE = process.env.CJS_ASSET_CODE;
 const CJS_ISSUER_ADDRESS = process.env.CJS_ISSUER_ADDRESS;
 const TREASURY_PUBLIC_KEY = process.env.TREASURY_PUBLIC_KEY;
