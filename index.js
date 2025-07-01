@@ -1,5 +1,5 @@
 //index.js
-const fs = require('node:fs');Add commentMore actions
+const fs = require('node:fs'); //Add commentMore actions
 const path = require('node:path');
 const { Client, Collection, GatewayIntentBits } = require('discord.js');
 //index.js
