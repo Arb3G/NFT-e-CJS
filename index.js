@@ -1,17 +1,30 @@
 //index.js
-const fs = require('fs');
-const path = require('path');
+// index.js
+const fs = require('node:fs');
+const path = require('node:path');
 const { Client, Collection, GatewayIntentBits } = require('discord.js');
-require('dotenv').config(); // only if using .env
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+// Check Discord token presence early and exit if missing
+if (!process.env.DISCORD_TOKEN) {
+  console.error('❌ ERROR: DISCORD_TOKEN environment variable not set.');
+  process.exit(1);
+}
 
-// Commands collection
+console.log('✅ Discord token: [loaded]');
+console.log('🚀 Starting bot...');
+
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds],
+});
+
 client.commands = new Collection();
+
+// Load command files
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-// Load commands
+console.log(`📁 Found ${commandFiles.length} command file(s).`);
+
 for (const file of commandFiles) {
   const filePath = path.join(commandsPath, file);
   const command = require(filePath);
@@ -20,11 +33,11 @@ for (const file of commandFiles) {
     client.commands.set(command.data.name, command);
     console.log(`✅ Loaded command: ${command.data.name}`);
   } else {
-    console.warn(`⚠️ Skipping ${file} (missing data or execute)`);
+    console.warn(`[WARN] Command ${file} is missing "data" or "execute".`);
   }
 }
 
-// Load events
+// Load event files
 const eventsPath = path.join(__dirname, 'events');
 const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
 
@@ -35,23 +48,40 @@ for (const file of eventFiles) {
   const event = require(filePath);
 
   if (event.once) {
-    client.once(event.name, (...args) => event.execute(...args));
+    client.once(event.name, (...args) => {
+      console.log(`🔁 Loaded event (once): ${event.name}`);
+      event.execute(...args, client);
+    });
   } else {
-    client.on(event.name, (...args) => event.execute(...args));
+    client.on(event.name, (...args) => {
+      console.log(`🔁 Loaded event: ${event.name}`);
+      event.execute(...args, client);
+    });
   }
 }
 
-// On bot ready
-client.once('ready', () => {
-  console.log(`✅ Bot connected as ${client.user.tag}`);
-  console.log(`🧠 Logged into ${client.guilds.cache.size} server(s):`);
-
-  client.guilds.cache.forEach(guild => {
-    console.log(`🔗 Guild: ${guild.name} (ID: ${guild.id})`);
+// Login to Discord
+client.login(process.env.DISCORD_TOKEN)
+  .then(() => console.log('📡 Login request sent to Discord.'))
+  .catch(error => {
+    console.error('❌ Login failed:', error);
+    process.exit(1);
   });
 
-  console.log(`📡 Ready to receive slash commands.`);
+// On ready
+client.once('ready', () => {
+  console.log(`🎉 Logged in as ${client.user.tag}! Bot is ready.`);
+  console.log(`🔗 Bot is currently in ${client.guilds.cache.size} server(s):`);
+  client.guilds.cache.forEach(guild => {
+    console.log(` - ${guild.name} (ID: ${guild.id})`);
+  });
 });
 
-// Login
-client.login(process.env.DISCORD_TOKEN || 'YOUR_DISCORD_TOKEN_HERE');
+// Error/warning handlers
+client.on('error', err => {
+  console.error('💥 Discord client error:', err);
+});
+
+client.on('warn', warning => {
+  console.warn('⚠️ Discord client warning:', warning);
+});
