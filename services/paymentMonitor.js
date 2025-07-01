@@ -1,5 +1,4 @@
 // services/paymentMonitor.js
-// services/paymentMonitor.js
 const fetch = require('node-fetch');
 const dayjs = require('dayjs');
 
@@ -63,3 +62,13 @@ async function checkTokenPayments(account) {
   } catch (error) {
     console.error('❌ Error checking payments:', error.message);
   }
+}
+
+function startPaymentMonitor() {
+  console.log('📡 Starting CJS payment monitor...');
+  setInterval(() => {
+    checkTokenPayments(MONITORED_ACCOUNT);
+  }, POLL_INTERVAL_MS);
+}
+
+startPaymentMonitor();
