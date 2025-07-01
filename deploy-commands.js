@@ -2,7 +2,7 @@
 //deploy-commands.js
 const { REST, Routes } = require('discord.js');
 const fs = require('node:fs');
-require('dotenv').config();
+//require('dotenv').config();
 
 const commands = [];
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
