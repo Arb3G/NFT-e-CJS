@@ -1,17 +1,16 @@
 // services/paymentMonitor.js
-const StellarSdk = require('stellar-sdk');
+const fetch = require('node-fetch');
 const dayjs = require('dayjs');
 
 // === CONFIGURATION ===
 const HORIZON = 'https://horizon.stellar.org';
-const PUBLIC_KEY = 'G...'; // Receiving account
+const PUBLIC_KEY = 'G...';      // Replace with your receiving account
 const CJS_ASSET_CODE = 'CJS';
-const CJS_ISSUER = 'G...'; // CJS asset issuer
-const MEMO_ID = 'user123'; // Replace with dynamic user ID or pass via CLI/arg/env
-const POLL_INTERVAL = 30 * 1000; // 30 seconds
+const CJS_ISSUER = 'G...';      // Replace with your token issuer
+const MEMO_ID = 'user123';      // Replace with actual user ID
+const POLL_INTERVAL = 30 * 1000;
 const MAX_ATTEMPTS = 3;
 
-const server = new StellarSdk.Server(HORIZON);
 let attempt = 0;
 let lastSeenTx = null;
 
@@ -30,20 +29,23 @@ function countdown(seconds) {
   });
 }
 
-// === MAIN POLLING FUNCTION ===
+// === FETCH HELPERS ===
+async function fetchJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 async function pollForPayment() {
   attempt++;
   console.log(`\n🔎 Attempt ${attempt} of ${MAX_ATTEMPTS}...`);
 
   try {
-    const payments = await server
-      .payments()
-      .forAccount(PUBLIC_KEY)
-      .order('desc')
-      .limit(10)
-      .call();
+    // Fetch last 10 payments to PUBLIC_KEY
+    const url = `${HORIZON}/accounts/${PUBLIC_KEY}/payments?order=desc&limit=10`;
+    const data = await fetchJSON(url);
 
-    for (const record of payments.records) {
+    for (const record of data._embedded.records) {
       if (
         record.type === 'payment' &&
         record.asset_type !== 'native' &&
@@ -51,32 +53,31 @@ async function pollForPayment() {
         record.asset_issuer === CJS_ISSUER &&
         record.to === PUBLIC_KEY
       ) {
-        // Fetch transaction to read the memo
-        const tx = await server.transactions().transaction(record.transaction_hash).call();
-        if (tx.memo === MEMO_ID) {
+        // Fetch the transaction to inspect memo
+        const txData = await fetchJSON(`${HORIZON}/transactions/${record.transaction_hash}`);
+        if (txData.memo === MEMO_ID) {
           if (record.transaction_hash !== lastSeenTx) {
             lastSeenTx = record.transaction_hash;
-            console.log(`✅ Payment received: ${record.amount} ${CJS_ASSET_CODE} from ${record.from}`);
+            console.log(`✅ Received ${record.amount} ${CJS_ASSET_CODE} at ${dayjs(record.created_at).format()}`);
             console.log(`🔗 https://stellar.expert/explorer/public/tx/${record.transaction_hash}`);
-            return process.exit(0); // Success, exit program
+            return process.exit(0);
           }
         }
       }
     }
 
-    // No payment found for this attempt
+    // Not found — retry if attempts left
     if (attempt < MAX_ATTEMPTS) {
       console.log(`❌ Payment not detected. Please complete the payment.`);
-      await countdown(POLL_INTERVAL / 1000); // Wait with visible countdown
-      pollForPayment(); // Try again
+      await countdown(POLL_INTERVAL / 1000);
+      pollForPayment();
     } else {
       console.log(`❌ Payment still not received after ${MAX_ATTEMPTS} attempts.`);
       console.log(`🔁 Please restart the program to try again.`);
-      process.exit(1); // Exit with error code
+      process.exit(1);
     }
-
   } catch (err) {
-    console.error(`❌ Error checking for payment:`, err.message);
+    console.error(`❌ Error:`, err.message);
     process.exit(1);
   }
 }
