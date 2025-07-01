@@ -1,4 +1,3 @@
-
 // events/interactionCreate.js
 module.exports = {
   name: 'interactionCreate',
