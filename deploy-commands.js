@@ -1,45 +1,39 @@
 //deploy-commands.js
-// deploy-commands.js
 const { REST, Routes } = require('discord.js');
 const fs = require('node:fs');
-const path = require('node:path');
-//require('dotenv').config(); // Ensure .env is loaded
 
-// ✅ Load commands from ./commands
+// Load commands
 const commands = [];
-const commandsPath = path.join(__dirname, 'commands');
-const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-
+const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
 for (const file of commandFiles) {
-  const filePath = path.join(commandsPath, file);
-  const command = require(filePath);
-  if (command.data) {
-    commands.push(command.data.toJSON());
-  }
+  const command = require(`./commands/${file}`);
+  if (command.data) commands.push(command.data.toJSON());
 }
 
-// ✅ Create REST client
+// Create REST client with debug enabled
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
-// 🧪 DEBUG logging
-console.log('📤 Preparing to register the following commands...');
-console.log('CLIENT_ID:', process.env.CLIENT_ID);
-console.log('Total commands:', commands.length);
-commands.forEach(cmd => console.log(` - ${cmd.name}`));
+// Enable debug logging for discord.js REST internals
+process.env.DEBUG = 'discord:*';
 
-// 🚀 Deploy
+console.log('📤 Attempting to register the following commands:');
+console.log('CLIENT_ID:', process.env.CLIENT_ID);
+console.log('GUILD_ID:', process.env.GUILD_ID);
+console.log('COMMANDS:', commands.map(cmd => cmd.name));
+
 (async () => {
   try {
-    console.log('🔎 Attempting to refresh global application (/) commands...');
-    await rest.put(
-      Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
-      { body: commands }
-    );
-    console.log('✅ Successfully registered application commands globally.');
+    console.log('🔎 Attempting to register commands...');
+
+    // Change this to guild commands for faster iteration if you have GUILD_ID
+    const route = process.env.GUILD_ID
+      ? Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID)
+      : Routes.applicationCommands(process.env.CLIENT_ID);
+
+    const response = await rest.put(route, { body: commands });
+
+    console.log('✅ Successfully registered commands:', response);
   } catch (error) {
-    console.error('❌ Error registering commands:', error);
-    if (error.response && error.response.data) {
-      console.error('📦 Error details:', error.response.data);
-    }
+    console.error('❌ Error:', error);
   }
 })();
