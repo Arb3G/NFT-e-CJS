@@ -14,7 +14,7 @@
     "discord": "^0.8.2",
     "discord.js": "^14.20.0",
     "node-fetch": "^2.6.12",
-    "qrcode": "^1.5.3",    // Or whatever version you install
+    "qrcode": "^1.5.3",    
     "stellar-sdk": "^12.3.0"
   },
   "engines": {
