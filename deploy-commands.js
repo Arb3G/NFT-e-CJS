@@ -32,7 +32,7 @@ commands.forEach(cmd => console.log(` - ${cmd.name}`));
   try {
     console.log('🔎 Attempting to refresh global application (/) commands...');
     await rest.put(
-      Routes.applicationCommands(process.env.CLIENT_ID),
+      Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
       { body: commands }
     );
     console.log('✅ Successfully registered application commands globally.');
