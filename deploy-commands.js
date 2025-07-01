@@ -3,7 +3,7 @@
 const { REST, Routes } = require('discord.js');
 const fs = require('node:fs');
 const path = require('node:path');
-require('dotenv').config(); // Ensure .env is loaded
+//require('dotenv').config(); // Ensure .env is loaded
 
 // ✅ Load commands from ./commands
 const commands = [];
