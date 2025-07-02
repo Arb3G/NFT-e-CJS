@@ -2,19 +2,19 @@
 const fetch = require('node-fetch');
 const dayjs = require('dayjs');
 
-// === CONFIGURATION ===
-const HORIZON = 'https://horizon.stellar.org';
-const PUBLIC_KEY = 'G...';      // Replace with your receiving account
-const CJS_ASSET_CODE = 'CJS';
-const CJS_ISSUER = 'G...';      // Replace with your token issuer
-const MEMO_ID = 'user123';      // Replace with actual user ID
-const POLL_INTERVAL = 30 * 1000;
-const MAX_ATTEMPTS = 3;
+// === CONFIGURATION from environment variables ===
+const HORIZON = process.env.HORIZON_URL || 'https://horizon.stellar.org';
+const PUBLIC_KEY = process.env.STELLAR_RECEIVE_PUBLIC; // Your receiving Stellar account
+const CJS_ASSET_CODE = process.env.CJS_ASSET_CODE;     // e.g. 'CJS'
+const CJS_ISSUER = process.env.STELLAR_ISSUER_ADDRESS; // Your token issuer account
+const POLL_INTERVAL = Number(process.env.POLL_INTERVAL_MS) || 30000; // default 30 seconds
+const MAX_ATTEMPTS = Number(process.env.MAX_PAYMENT_ATTEMPTS) || 3;
 
-let attempt = 0;
-let lastSeenTx = null;
+if (!PUBLIC_KEY || !CJS_ASSET_CODE || !CJS_ISSUER) {
+  throw new Error('Missing required environment variables: PUBLIC_KEY, CJS_ASSET_CODE, or CJS_ISSUER.');
+}
 
-// === HELPER: Countdown display ===
+// Countdown helper to display wait time
 function countdown(seconds) {
   return new Promise(resolve => {
     const interval = setInterval(() => {
@@ -29,58 +29,68 @@ function countdown(seconds) {
   });
 }
 
-// === FETCH HELPERS ===
+// Fetch JSON helper with error handling
 async function fetchJSON(url) {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} for URL: ${url}`);
   return res.json();
 }
 
-async function pollForPayment() {
-  attempt++;
-  console.log(`\n🔎 Attempt ${attempt} of ${MAX_ATTEMPTS}...`);
+/**
+ * Poll Stellar Horizon for payments to PUBLIC_KEY matching the memoId.
+ * @param {string} memoId - The memo ID to match payment against (e.g. user ID).
+ * @returns {Promise<object>} Result object with success info or failure reason.
+ */
+async function startPaymentMonitor(memoId) {
+  console.log(`📡 Monitoring payments to ${PUBLIC_KEY} for memo: "${memoId}"`);
 
-  try {
-    // Fetch last 10 payments to PUBLIC_KEY
-    const url = `${HORIZON}/accounts/${PUBLIC_KEY}/payments?order=desc&limit=10`;
-    const data = await fetchJSON(url);
+  let attempt = 0;
+  let lastSeenTx = null;
 
-    for (const record of data._embedded.records) {
-      if (
-        record.type === 'payment' &&
-        record.asset_type !== 'native' &&
-        record.asset_code === CJS_ASSET_CODE &&
-        record.asset_issuer === CJS_ISSUER &&
-        record.to === PUBLIC_KEY
-      ) {
-        // Fetch the transaction to inspect memo
-        const txData = await fetchJSON(`${HORIZON}/transactions/${record.transaction_hash}`);
-        if (txData.memo === MEMO_ID) {
-          if (record.transaction_hash !== lastSeenTx) {
+  while (attempt < MAX_ATTEMPTS) {
+    attempt++;
+    console.log(`\n🔎 Attempt ${attempt} of ${MAX_ATTEMPTS}...`);
+
+    try {
+      const url = `${HORIZON}/accounts/${PUBLIC_KEY}/payments?order=desc&limit=10`;
+      const data = await fetchJSON(url);
+
+      for (const record of data._embedded.records) {
+        if (
+          record.type === 'payment' &&
+          record.asset_type !== 'native' &&
+          record.asset_code === CJS_ASSET_CODE &&
+          record.asset_issuer === CJS_ISSUER &&
+          record.to === PUBLIC_KEY
+        ) {
+          const txData = await fetchJSON(`${HORIZON}/transactions/${record.transaction_hash}`);
+          if (txData.memo === memoId && record.transaction_hash !== lastSeenTx) {
             lastSeenTx = record.transaction_hash;
+
             console.log(`✅ Received ${record.amount} ${CJS_ASSET_CODE} at ${dayjs(record.created_at).format()}`);
             console.log(`🔗 https://stellar.expert/explorer/public/tx/${record.transaction_hash}`);
-            return process.exit(0);
+
+            return {
+              success: true,
+              amount: record.amount,
+              hash: record.transaction_hash,
+              timestamp: record.created_at,
+            };
           }
         }
       }
-    }
 
-    // Not found — retry if attempts left
-    if (attempt < MAX_ATTEMPTS) {
-      console.log(`❌ Payment not detected. Please complete the payment.`);
-      await countdown(POLL_INTERVAL / 1000);
-      pollForPayment();
-    } else {
-      console.log(`❌ Payment still not received after ${MAX_ATTEMPTS} attempts.`);
-      console.log(`🔁 Please restart the program to try again.`);
-      process.exit(1);
+      console.log('❌ No matching payment found yet.');
+      if (attempt < MAX_ATTEMPTS) await countdown(POLL_INTERVAL / 1000);
+
+    } catch (err) {
+      console.error(`❌ Payment monitor error:`, err.message);
+      return { success: false, error: err.message };
     }
-  } catch (err) {
-    console.error(`❌ Error:`, err.message);
-    process.exit(1);
   }
+
+  console.log(`⏹️ Timeout: No matching payment found after ${MAX_ATTEMPTS} attempts.`);
+  return { success: false, timeout: true };
 }
 
-// === START ===
-pollForPayment();
+module.exports = { startPaymentMonitor };
