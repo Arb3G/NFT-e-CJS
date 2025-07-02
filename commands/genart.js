@@ -1,42 +1,92 @@
 //genart.js for Discord
 // commands/genart.js
-const { SlashCommandBuilder } = require('discord.js');
+// commands/genart.js
+const {
+  SlashCommandBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+} = require('discord.js');
+
 const { runGenartFlow } = require('../services/genartFlow');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('genart')
-    .setDescription('Generate AI art using your $CJS tokens')
-    .addStringOption(option =>
-      option.setName('userid')
-        .setDescription('Your CJS User ID (NOT Discord ID)')
-        .setRequired(true)
-    ),
+    .setDescription('Generate AI art using your $CJS tokens'),
 
   async execute(interaction) {
-    const userId = interaction.options.getString('userid');
+    await interaction.deferReply({ ephemeral: true });
 
-    try {
-      await interaction.deferReply({ ephemeral: true });
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('yes_registered')
+        .setLabel('Yes')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('no_not_registered')
+        .setLabel('No')
+        .setStyle(ButtonStyle.Secondary)
+    );
 
-      await runGenartFlow({
-        userId,
-        send: async (msg, options = {}) => {
-          return interaction.followUp({ content: msg, ephemeral: true, ...options });
-        },
-      });
+    await interaction.editReply({
+      content:
+        `👋🏾 Welcome to the **CJS Art Engine** — where your imagination meets the blockchain.\n\n` +
+        `Are you already registered with your Stellar wallet?\n\n` +
+        `**Why is registration important?**\n` +
+        `- It links your CJS User ID to your Stellar wallet.\n` +
+        `- We check your **$CJS balance** (10 required to generate art).\n` +
+        `- It enables minting your art as an **NFT**!\n\n` +
+        `👉 Click **Yes** if you're registered, or **No** to register now.`,
+      components: [row],
+    });
 
-      await interaction.followUp({
-        content: `🎨 Payment confirmed! Starting your art generation...`,
-        ephemeral: true,
-      });
+    const collector = interaction.channel.createMessageComponentCollector({
+      time: 60000,
+      filter: i => i.user.id === interaction.user.id,
+    });
 
-    } catch (error) {
-      await interaction.followUp({
-        content: `❌ Error: ${error.message || 'Unexpected failure.'}`,
-        ephemeral: true,
-      });
-    }
+    collector.on('collect', async i => {
+      if (i.customId === 'yes_registered') {
+        await i.reply({ content: 'Please enter your **CJS User ID** (not Discord ID):', ephemeral: true });
+
+        const messageCollector = interaction.channel.createMessageCollector({
+          time: 60000,
+          filter: m => m.author.id === interaction.user.id,
+        });
+
+        messageCollector.on('collect', async m => {
+          const userId = m.content.trim();
+          messageCollector.stop();
+
+          await i.followUp({ content: `🔎 Looking up ID \`${userId}\`...`, ephemeral: true });
+
+          const result = await runGenartFlow(userId, async msg => {
+            await i.followUp({ content: msg, ephemeral: true });
+          });
+
+          if (!result.success) {
+            console.log('⚠️ genart flow failed:', result.reason);
+          }
+        });
+      }
+
+      if (i.customId === 'no_not_registered') {
+        await i.reply({
+          content: 'Please send your **Stellar public key** to register.',
+          ephemeral: true,
+        });
+        collector.stop();
+      }
+    });
+
+    collector.on('end', collected => {
+      if (collected.size === 0) {
+        interaction.followUp({
+          content: `⏰ You took too long to respond. Please run \`/genart\` again.`,
+          ephemeral: true,
+        });
+      }
+    });
   },
 };
-
