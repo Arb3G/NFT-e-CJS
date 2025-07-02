@@ -1,21 +1,16 @@
 //genart
-// commands/genart.js
-// commands/genart.js
 const {
   SlashCommandBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
 } = require('discord.js');
-
 const QRCode = require('qrcode');
 
 const { getUser } = require('../services/db');
 const { checkCJSBalance } = require('../services/tokenCheck');
-const { waitForPayment } = require('../services/paymentMonitor');
+const { startPaymentMonitor } = require('../services/paymentMonitor');
 
-const TREASURY_PUBLIC_KEY = 'G...YOUR_TREASURY_ACCOUNT_PUBLIC_KEY';
-const CJS_ISSUER_PUBLIC_KEY = 'G...YOUR_CJS_ISSUER_PUBLIC_KEY';
 const PAYMENT_AMOUNT = '10';
 
 module.exports = {
@@ -66,7 +61,6 @@ module.exports = {
         await i.deferReply({ ephemeral: true });
 
         const user = await getUser(userId);
-
         if (!user) {
           await i.editReply({
             content: `❗ No wallet found for ID \`${userId}\`. Please send your **Stellar public key** to register.`,
@@ -76,7 +70,6 @@ module.exports = {
         }
 
         const balance = await checkCJSBalance(user.public_key);
-
         if (balance < 10) {
           await i.editReply({
             content:
@@ -88,7 +81,9 @@ module.exports = {
           return;
         }
 
-        // Generate Stellar payment URI with memo for tracking
+        // Generate payment URI and QR code
+        const TREASURY_PUBLIC_KEY = process.env.TREASURY_PUBLIC_KEY || 'G...YOUR_TREASURY_ACCOUNT_PUBLIC_KEY';
+        const CJS_ISSUER_PUBLIC_KEY = process.env.CJS_ISSUER_PUBLIC_KEY || 'G...YOUR_CJS_ISSUER_PUBLIC_KEY';
         const memo = `genart-${userId}`;
         const paymentURI = `web+stellar:pay?destination=${TREASURY_PUBLIC_KEY}` +
           `&amount=${PAYMENT_AMOUNT}` +
@@ -96,10 +91,8 @@ module.exports = {
           `&asset_issuer=${CJS_ISSUER_PUBLIC_KEY}` +
           `&memo=${encodeURIComponent(memo)}`;
 
-        // Generate QR code image data URL from payment URI
         const qrCodeDataUrl = await QRCode.toDataURL(paymentURI);
 
-        // Send payment request with QR code and link
         await i.editReply({
           content:
             `✅ You're verified and funded!\n\n` +
@@ -109,10 +102,21 @@ module.exports = {
           files: [{ attachment: qrCodeDataUrl, name: 'payment-qr.png' }],
         });
 
-        // Wait for payment confirmation
-        const confirmed = await waitForPayment(user.public_key, PAYMENT_AMOUNT, memo, 90000); // 90 seconds timeout
+        // Check config now, after payment info sent
+        if (!TREASURY_PUBLIC_KEY || !CJS_ISSUER_PUBLIC_KEY) {
+          await i.followUp({
+            content:
+              '❌ Server config error: Payment system is not properly configured. Please contact the admin.',
+            ephemeral: true,
+          });
+          collector.stop();
+          return;
+        }
 
-        if (!confirmed) {
+        // Wait for payment confirmation
+        const confirmed = await startPaymentMonitor(user.public_key, PAYMENT_AMOUNT, memo, 90000);
+
+        if (!confirmed.success) {
           await i.followUp({
             content: `❌ Payment not detected within 90 seconds. Please rerun the command once complete.`,
             ephemeral: true,
@@ -131,12 +135,10 @@ module.exports = {
 
       if (i.customId === 'no_not_registered') {
         await i.deferReply({ ephemeral: true });
-
         await i.editReply({
           content:
             `No problem! Please send your **Stellar public key** (e.g., GABC...1234) to link your wallet to ID \`${userId}\`.`,
         });
-
         collector.stop();
       }
     });
