@@ -38,26 +38,24 @@ module.exports = {
     });
   },
 
-  // Handle button presses
   async handleButton(interaction) {
     const { customId } = interaction;
 
     if (customId === 'yes_registered') {
+      // Update message to prompt for CJS User ID and remove buttons
       await interaction.update({ content: '🔑 Please enter your CJS User ID (not Discord ID):', components: [] });
 
-      const collector = interaction.channel.createMessageCollector({
-        filter: m => m.author.id === interaction.user.id,
-        max: 1,
-        time: 60000,
-      });
+      const filter = m => m.author.id === interaction.user.id;
+      const collector = interaction.channel.createMessageCollector({ filter, max: 1, time: 60000 });
 
-      collector.on('collect', async message => {
+      collector.on('collect', async (message) => {
         const userId = message.content.trim();
 
-        await message.reply({ content: '✅ Verifying your registration and balance...', ephemeral: true });
+        // Use interaction.followUp to keep messages ephemeral and in context
+        await interaction.followUp({ content: '✅ Verifying your registration and balance...', ephemeral: true });
 
         const result = await runGenartFlow(userId, async (msg) => {
-          await message.reply({ content: msg, ephemeral: true });
+          await interaction.followUp({ content: msg, ephemeral: true });
         });
 
         if (!result.success) {
@@ -65,9 +63,9 @@ module.exports = {
         }
       });
 
-      collector.on('end', collected => {
+      collector.on('end', async (collected) => {
         if (collected.size === 0) {
-          interaction.followUp({
+          await interaction.followUp({
             content: `⏰ You took too long. Please run \`/genart\` again.`,
             ephemeral: true,
           });
