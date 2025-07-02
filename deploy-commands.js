@@ -2,27 +2,41 @@
 const { REST, Routes } = require('discord.js');
 const fs = require('node:fs');
 
-// ✅ Load environment variables (manually or via dotenv)
+// Uncomment this line if you use a .env file instead of shell exports
 // require('dotenv').config();
 
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.CLIENT_ID;
 const guildId = process.env.GUILD_ID;
 
+console.log('--- Environment Variables ---');
+console.log('DISCORD_TOKEN:', token ? '✅ set' : '❌ missing');
+console.log('CLIENT_ID:', clientId || '❌ missing');
+console.log('GUILD_ID:', guildId || '❌ missing');
+console.log('-----------------------------');
+
 if (!token || !clientId || !guildId) {
-  console.error('❌ Missing DISCORD_TOKEN, CLIENT_ID, or GUILD_ID in env vars.');
+  console.error('❌ Missing DISCORD_TOKEN, CLIENT_ID, or GUILD_ID environment variables.');
   process.exit(1);
 }
 
+// Load commands
 const commands = [];
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
 
+console.log(`📁 Found ${commandFiles.length} command file(s).`);
+
 for (const file of commandFiles) {
-  const command = require(`./commands/${file}`);
-  if (command.data) {
-    commands.push(command.data.toJSON());
-  } else {
-    console.warn(`⚠️ Skipping command ${file} — missing .data`);
+  try {
+    const command = require(`./commands/${file}`);
+    if (command.data && typeof command.data.toJSON === 'function') {
+      commands.push(command.data.toJSON());
+      console.log(`✅ Loaded command: ${command.data.name}`);
+    } else {
+      console.warn(`⚠️ Skipping command ${file} — missing or invalid .data`);
+    }
+  } catch (error) {
+    console.error(`❌ Error loading command file ${file}:`, error);
   }
 }
 
