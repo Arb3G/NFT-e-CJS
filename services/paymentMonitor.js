@@ -1,18 +1,7 @@
 // services/paymentMonitor.js
+// services/paymentMonitor.js
 const fetch = require('node-fetch');
 const dayjs = require('dayjs');
-
-// === CONFIGURATION from environment variables ===
-const HORIZON = process.env.HORIZON_URL || 'https://horizon.stellar.org';
-const PUBLIC_KEY = process.env.STELLAR_RECEIVE_PUBLIC; // Your receiving Stellar account
-const CJS_ASSET_CODE = process.env.CJS_ASSET_CODE;     // e.g. 'CJS'
-const CJS_ISSUER = process.env.STELLAR_ISSUER_ADDRESS; // Your token issuer account
-const POLL_INTERVAL = Number(process.env.POLL_INTERVAL_MS) || 30000; // default 30 seconds
-const MAX_ATTEMPTS = Number(process.env.MAX_PAYMENT_ATTEMPTS) || 3;
-
-if (!PUBLIC_KEY || !CJS_ASSET_CODE || !CJS_ISSUER) {
-  throw new Error('Missing required environment variables: PUBLIC_KEY, CJS_ASSET_CODE, or CJS_ISSUER.');
-}
 
 // Countdown helper to display wait time
 function countdown(seconds) {
@@ -38,21 +27,35 @@ async function fetchJSON(url) {
 
 /**
  * Poll Stellar Horizon for payments to PUBLIC_KEY matching the memoId.
- * @param {string} memoId - The memo ID to match payment against (e.g. user ID).
+ * @param {string} publicKey - Recipient's wallet (usually treasury)
+ * @param {string} amount - Expected token amount (as string)
+ * @param {string} memoId - The memo ID to match
+ * @param {number} timeoutMs - Max duration to wait (default 90000ms)
  * @returns {Promise<object>} Result object with success info or failure reason.
  */
-async function startPaymentMonitor(memoId) {
-  console.log(`📡 Monitoring payments to ${PUBLIC_KEY} for memo: "${memoId}"`);
+async function startPaymentMonitor(publicKey, amount, memoId, timeoutMs = 90000) {
+  // Pull config lazily
+  const HORIZON = process.env.HORIZON_URL || 'https://horizon.stellar.org';
+  const CJS_ASSET_CODE = process.env.CJS_ASSET_CODE;
+  const CJS_ISSUER = process.env.STELLAR_ISSUER_ADDRESS;
+  const POLL_INTERVAL = Number(process.env.POLL_INTERVAL_MS) || 30000;
+  const MAX_ATTEMPTS = Math.ceil(timeoutMs / POLL_INTERVAL);
+
+  if (!publicKey || !CJS_ASSET_CODE || !CJS_ISSUER) {
+    throw new Error('Missing required environment variables: PUBLIC_KEY, CJS_ASSET_CODE, or CJS_ISSUER.');
+  }
 
   let attempt = 0;
   let lastSeenTx = null;
+
+  console.log(`📡 Monitoring payments to ${publicKey} for memo: "${memoId}"`);
 
   while (attempt < MAX_ATTEMPTS) {
     attempt++;
     console.log(`\n🔎 Attempt ${attempt} of ${MAX_ATTEMPTS}...`);
 
     try {
-      const url = `${HORIZON}/accounts/${PUBLIC_KEY}/payments?order=desc&limit=10`;
+      const url = `${HORIZON}/accounts/${publicKey}/payments?order=desc&limit=10`;
       const data = await fetchJSON(url);
 
       for (const record of data._embedded.records) {
@@ -61,7 +64,7 @@ async function startPaymentMonitor(memoId) {
           record.asset_type !== 'native' &&
           record.asset_code === CJS_ASSET_CODE &&
           record.asset_issuer === CJS_ISSUER &&
-          record.to === PUBLIC_KEY
+          record.to === publicKey
         ) {
           const txData = await fetchJSON(`${HORIZON}/transactions/${record.transaction_hash}`);
           if (txData.memo === memoId && record.transaction_hash !== lastSeenTx) {
