@@ -1,6 +1,5 @@
 //genart.js for Discord
 // commands/genart.js
-// commands/genart.js
 const {
   SlashCommandBuilder,
   ActionRowBuilder,
@@ -35,8 +34,8 @@ module.exports = {
         `Are you already registered with your Stellar wallet?\n\n` +
         `**Why is registration important?**\n` +
         `- It links your CJS User ID to your Stellar wallet.\n` +
-        `- We check your **$CJS balance** (10 required to generate art).\n` +
-        `- It enables minting your art as an **NFT**!\n\n` +
+        `- We verify your **$CJS balance** (10 required to generate art).\n` +
+        `- It allows us to mint your art as an **NFT** later.\n\n` +
         `👉 Click **Yes** if you're registered, or **No** to register now.`,
       components: [row],
     });
@@ -48,7 +47,10 @@ module.exports = {
 
     collector.on('collect', async i => {
       if (i.customId === 'yes_registered') {
-        await i.reply({ content: 'Please enter your **CJS User ID** (not Discord ID):', ephemeral: true });
+        await i.reply({
+          content: '🔑 Please enter your **CJS User ID** (not Discord ID):',
+          ephemeral: true,
+        });
 
         const messageCollector = interaction.channel.createMessageCollector({
           time: 60000,
@@ -59,21 +61,21 @@ module.exports = {
           const userId = m.content.trim();
           messageCollector.stop();
 
-          await i.followUp({ content: `🔎 Looking up ID \`${userId}\`...`, ephemeral: true });
+          await i.followUp({ content: `🔍 Looking up ID \`${userId}\`...`, ephemeral: true });
 
           const result = await runGenartFlow(userId, async msg => {
             await i.followUp({ content: msg, ephemeral: true });
           });
 
           if (!result.success) {
-            console.log('⚠️ genart flow failed:', result.reason);
+            console.warn(`⚠️ genart flow failed:`, result.reason);
           }
         });
       }
 
       if (i.customId === 'no_not_registered') {
         await i.reply({
-          content: 'Please send your **Stellar public key** to register.',
+          content: '📝 Please send your **Stellar public key** to register. You can run `/register` to begin.',
           ephemeral: true,
         });
         collector.stop();
