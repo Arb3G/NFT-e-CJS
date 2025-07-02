@@ -68,7 +68,7 @@ client.login(process.env.DISCORD_TOKEN)
     process.exit(1);
   });
 
-// On ready
+// Inline ready handler — NOT in ready.js
 client.once('ready', () => {
   console.log(`🎉 Logged in as ${client.user.tag}! Bot is ready.`);
   console.log(`🔗 Bot is currently in ${client.guilds.cache.size} server(s):`);
@@ -77,7 +77,7 @@ client.once('ready', () => {
   });
 });
 
-// Error/warning handlers
+// Optional error/warning logging
 client.on('error', err => {
   console.error('💥 Discord client error:', err);
 });
