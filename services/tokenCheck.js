@@ -4,7 +4,7 @@ const fetch = require('node-fetch');
 
 // Load asset info from environment variables
 const CJS_ASSET_CODE = process.env.CJS_ASSET_CODE;
-const CJS_ISSUER_ADDRESS = process.env.CJS_ISSUER_ADDRESS;
+const CJS_ISSUER_ADDRESS = process.env.STELLAR_ISSUER_ADDRESS;
 const HORIZON_URL = 'https://horizon.stellar.org'; // Or testnet if needed
 
 /**
