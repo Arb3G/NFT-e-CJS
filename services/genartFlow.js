@@ -34,7 +34,8 @@ async function runGenartFlow(userId, send, options = {}) {
   }
 
   // Required payment info from environment
-  const TREASURY_PUBLIC_KEY = process.env.TREASURY_PUBLIC_KEY;
+  //const TREASURY_PUBLIC_KEY = process.env.TREASURY_PUBLIC_KEY; ** using the below for now, update to actual TREASURY in the future ***
+  const TREASURY_PUBLIC_KEY = process.env.STELLAR_ISSUER_ADDRESS;
   const STELLAR_ISSUER_ADDRESS = process.env.STELLAR_ISSUER_ADDRESS;
 
   if (!TREASURY_PUBLIC_KEY || !STELLAR_ISSUER_ADDRESS) {
