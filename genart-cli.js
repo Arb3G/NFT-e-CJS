@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const readline = require('readline');
-const { runGenartFlow } = require('../services/genartFlow');
+const { runGenartFlow } = require('./services/genartFlow');
 
 async function main() {
   const rl = readline.createInterface({
