@@ -1,5 +1,5 @@
 //genart-cli.js
-#!/usr/bin/env node
+//#!/usr/bin/env node
 const readline = require('readline');
 const qrcode = require('qrcode-terminal');
 const { runGenartFlow } = require('./services/genartFlow');
