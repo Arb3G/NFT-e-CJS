@@ -45,6 +45,17 @@ const route = Routes.applicationGuildCommands(clientId, guildId);
 
 (async () => {
   try {
+    console.log('Testing bot guild membership...');
+    const guild = await rest.get(Routes.guild(guildId));
+    console.log(`Guild found: ${guild.name} (ID: ${guild.id})`);
+  } catch (error) {
+    console.error('Failed to access guild:', error);
+  }
+})();
+
+
+(async () => {
+  try {
     console.log('🧹 Attempting to clear existing guild commands...');
     await rest.put(route, { body: [] });
     console.log('✅ Cleared existing guild commands.');
