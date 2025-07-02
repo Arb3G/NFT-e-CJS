@@ -1,21 +1,41 @@
 #!/usr/bin/env node
-const { runGenArt } = require('./services/genartLogic');
 
-const userId = process.argv[2];
-if (!userId) {
-  console.error('Usage: node genart-cli.js <userId>');
-  process.exit(1);
+const readline = require('readline');
+const { runGenartFlow } = require('./services/genartFlow');
+
+async function prompt(question) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise(resolve =>
+    rl.question(question, answer => {
+      rl.close();
+      resolve(answer.trim());
+    })
+  );
 }
 
 (async () => {
+  console.log('\n🎨 Welcome to the CJS Art Engine (CLI Edition)');
+  console.log('💡 This tool lets you generate AI art using your $CJS tokens.\n');
+
+  const userId = await prompt('🔑 Enter your CJS User ID (not Discord ID): ');
+
   try {
-    console.log(`Starting genart for user ${userId}...`);
-    const result = await runGenArt(userId, {
-      sendReply: (msg) => console.log(msg), // simple console output
-      // optionally handle CLI input, QR code display etc.
+    await runGenartFlow({
+      userId,
+      send: async (msg) => {
+        console.log('\n' + msg);
+      },
     });
-    console.log('Payment confirmed! You can now describe your art.');
-  } catch (err) {
-    console.error('Error:', err.message);
+
+    console.log('\n✅ Payment confirmed! Proceeding to generate your art...');
+    // You can call a local art generation function here if needed
+
+  } catch (error) {
+    console.error('\n❌ Error:', error.message || 'Unexpected failure.');
+    process.exit(1);
   }
 })();
