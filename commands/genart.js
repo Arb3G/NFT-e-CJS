@@ -97,7 +97,7 @@ module.exports = {
           console.warn('🛑 No message collected from user');
           await interaction.followUp({
             content: '⏰ You took too long. Please run `/genart` again.',
-            ephemeral: true,
+            ephemeral: false,
           });
         }
       });
