@@ -48,18 +48,33 @@ module.exports = {
     // ✅ YES: public message-based input
     if (customId === 'yes_registered') {
       await interaction.update({
-        content: '🔑 Please enter your CJS User ID (not Discord ID) below in this channel:',
+        content: '🔑 Please enter your CJS User ID below:',
         components: [],
         ephemeral: false,
       });
+
+      console.log('🧭 Collector will listen in:');
+      console.log(`   Interaction channel ID: ${interaction.channel?.id}`);
+      console.log(`   Interaction channel name: ${interaction.channel?.name}`);
 
       const filter = m => m.author.id === interaction.user.id;
       const collector = interaction.channel.createMessageCollector({ filter, max: 1, time: 60000 });
 
       collector.on('collect', async (msg) => {
-        const userId = msg.content.trim();
+        console.log(`📥 Collected message: "${msg.content}" from ${msg.author.tag}`);
+        console.log(`   Message channel ID: ${msg.channel?.id}`);
+        console.log(`   Message channel name: ${msg.channel?.name}`);
 
-        // 🧹 Delete the original message
+        const raw = msg.content;
+        const userId = raw.replace(/<@!?(\d+)>/g, '').trim();
+
+        if (!/^[a-zA-Z0-9_-]{3,30}$/.test(userId)) {
+          await msg.channel.send(
+            '❌ Invalid CJS ID. It must be 3–30 characters long and contain only letters, numbers, `_`, or `-`.'
+          );
+          return;
+        }
+
         try {
           await msg.delete();
         } catch (err) {
@@ -79,8 +94,9 @@ module.exports = {
 
       collector.on('end', async (collected, reason) => {
         if (collected.size === 0) {
+          console.warn('🛑 No message collected from user');
           await interaction.followUp({
-            content: '⏰ You took too long to respond. Please try `/genart` again.',
+            content: '⏰ You took too long. Please run `/genart` again.',
             ephemeral: true,
           });
         }
