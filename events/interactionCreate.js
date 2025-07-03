@@ -3,7 +3,7 @@ module.exports = {
   name: 'interactionCreate',
 
   async execute(interaction, client) {
-    // ✅ Handle slash commands like /genart, /register, etc.
+    // Slash commands: /genart, /register, etc.
     if (interaction.isChatInputCommand()) {
       const command = client.commands.get(interaction.commandName);
       if (!command) {
@@ -25,7 +25,7 @@ module.exports = {
       return;
     }
 
-    // ✅ Handle button interactions (currently all routed to genart handler)
+    // Button interactions (Yes / No in /genart)
     if (interaction.isButton()) {
       try {
         const command = client.commands.get('genart');
@@ -40,49 +40,46 @@ module.exports = {
           await interaction.reply({ content: '❌ Button error.', ephemeral: true });
         }
       }
-      return;
     }
 
-    // ✅ Handle modal submissions
+    // Modal submission for registration
     if (interaction.isModalSubmit()) {
-      // 🔹 Optional: YES flow via modal (not currently used, safe to keep)
-      if (interaction.customId === 'cjs_id_modal') {
-        const userId = interaction.fields.getTextInputValue('cjs_user_id_input').trim();
-
-        await interaction.reply({
-          content: '✅ Verifying your registration and balance...',
-          ephemeral: true,
-        });
-
-        const result = await require('../services/genartFlow').runGenartFlow(userId, async (msg) => {
-          await interaction.followUp({ content: msg, ephemeral: true });
-        });
-
-        if (!result.success) {
-          console.warn(`⚠️ GenArt flow failed for ${userId}:`, result.reason);
-        }
-        return;
-      }
-
-      // 🔹 Registration modal from "No" button
       if (interaction.customId === 'register_modal') {
+        const { addUser } = require('../services/db');
+
         const userId = interaction.fields.getTextInputValue('reg_cjs_id').trim();
         const wallet = interaction.fields.getTextInputValue('reg_wallet').trim();
 
-        // 🔧 TODO: Save to DB (Supabase, Firebase, etc.)
-        console.log(`📝 Registration received: ${userId} → ${wallet}`);
+        if (!/^[a-zA-Z0-9_-]{3,30}$/.test(userId)) {
+          await interaction.reply({
+            content: '❌ Invalid CJS ID. Use 3–30 letters, numbers, dashes or underscores.',
+            ephemeral: true,
+          });
+          return;
+        }
+
+        if (!/^G[A-Z2-7]{55}$/.test(wallet)) {
+          await interaction.reply({
+            content: '❌ Invalid Stellar wallet address.',
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const saved = await addUser(userId, wallet);
+        if (!saved) {
+          await interaction.reply({
+            content: '❌ Registration failed. Please try again later.',
+            ephemeral: true,
+          });
+          return;
+        }
 
         await interaction.reply({
           content:
-            `✅ Registration complete!\n**CJS ID**: \`${userId}\`\n**Wallet**: \`${wallet}\`\n\nWelcome, ${interaction.user.username}!`,
+            `✅ Registered!\n**CJS ID**: \`${userId}\`\n**Wallet**: \`${wallet}\`\n\nYou may now run \`/genart\`.`,
           ephemeral: true,
         });
-
-        await interaction.followUp({
-          content: `🎨 You can now run \`/genart\` to generate your first image.`,
-          ephemeral: true,
-        });
-        return;
       }
     }
   },
