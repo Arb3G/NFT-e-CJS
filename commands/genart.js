@@ -1,8 +1,12 @@
+//commands/genart.js
 const {
   SlashCommandBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
 } = require('discord.js');
 
 const { runGenartFlow } = require('../services/genartFlow');
@@ -41,43 +45,72 @@ module.exports = {
   async handleButton(interaction) {
     const { customId } = interaction;
 
+    // ✅ YES: public message-based input
     if (customId === 'yes_registered') {
-      // Update message to prompt for CJS User ID and remove buttons
-      await interaction.update({ content: '🔑 Please enter your CJS User ID (not Discord ID):', components: [] });
+      await interaction.update({
+        content: '🔑 Please enter your CJS User ID (not Discord ID) below in this channel:',
+        components: [],
+        ephemeral: false,
+      });
 
       const filter = m => m.author.id === interaction.user.id;
       const collector = interaction.channel.createMessageCollector({ filter, max: 1, time: 60000 });
 
-      collector.on('collect', async (message) => {
-        const userId = message.content.trim();
+      collector.on('collect', async (msg) => {
+        const userId = msg.content.trim();
 
-        // Use interaction.followUp to keep messages ephemeral and in context
-        await interaction.followUp({ content: '✅ Verifying your registration and balance...', ephemeral: true });
+        // 🧹 Delete the original message
+        try {
+          await msg.delete();
+        } catch (err) {
+          console.warn('⚠️ Could not delete message:', err.message);
+        }
 
-        const result = await runGenartFlow(userId, async (msg) => {
-          await interaction.followUp({ content: msg, ephemeral: true });
+        await msg.channel.send(`✅ Thanks, ${interaction.user.username}. Verifying your registration...`);
+
+        const result = await runGenartFlow(userId, async (response) => {
+          await msg.channel.send(response);
         });
 
         if (!result.success) {
-          console.warn(`Flow failed:`, result.reason);
+          console.warn(`❌ GenArt flow failed: ${result.reason}`);
         }
       });
 
-      collector.on('end', async (collected) => {
+      collector.on('end', async (collected, reason) => {
         if (collected.size === 0) {
           await interaction.followUp({
-            content: `⏰ You took too long. Please run \`/genart\` again.`,
+            content: '⏰ You took too long to respond. Please try `/genart` again.',
             ephemeral: true,
           });
         }
       });
     }
 
+    // ❌ NO: open registration modal
     if (customId === 'no_not_registered') {
-      await interaction.update({
-        content: `📥 To register, please run the \`/register\` command and include your Stellar public key.`,
-        components: [],
-      });
+      const modal = new ModalBuilder()
+        .setCustomId('register_modal')
+        .setTitle('Register Your Wallet');
+
+      const cjsIdInput = new TextInputBuilder()
+        .setCustomId('reg_cjs_id')
+        .setLabel('Preferred CJS ID')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+      const walletInput = new TextInputBuilder()
+        .setCustomId('reg_wallet')
+        .setLabel('Stellar Wallet Address (CJS Address)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(cjsIdInput),
+        new ActionRowBuilder().addComponents(walletInput)
+      );
+
+      await interaction.showModal(modal);
     }
   },
 };
