@@ -38,19 +38,20 @@ module.exports = {
             .setStyle(ButtonStyle.Secondary),
         ),
       ],
-      ephemeral: true,
+      ephemeral: true, // ✅ initial message is ephemeral
     });
   },
 
   async handleButton(interaction) {
     const { customId } = interaction;
 
-    // ✅ YES: public message-based input
+    // ✅ YES: collect CJS ID in public message
     if (customId === 'yes_registered') {
-      await interaction.update({
-        content: '🔑 Please enter your CJS User ID below:',
-        components: [],
-        ephemeral: false,
+      await interaction.update({ components: [] }); // don't change content or ephemeral
+
+      const promptMessage = await interaction.followUp({
+        content: '🔑 Please enter your CJS User ID (not Discord ID) below in this channel:',
+        ephemeral: false, // ✅ THIS is what makes it public
       });
 
       console.log('🧭 Collector will listen in:');
@@ -97,7 +98,7 @@ module.exports = {
           console.warn('🛑 No message collected from user');
           await interaction.followUp({
             content: '⏰ You took too long. Please run `/genart` again.',
-            ephemeral: false,
+            ephemeral: true,
           });
         }
       });
