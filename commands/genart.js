@@ -38,7 +38,7 @@ module.exports = {
             .setStyle(ButtonStyle.Secondary),
         ),
       ],
-      ephemeral: true,
+      ephemeral: false,
     });
   },
 
