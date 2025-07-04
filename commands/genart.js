@@ -38,7 +38,7 @@ module.exports = {
             .setStyle(ButtonStyle.Secondary),
         ),
       ],
-      ephemeral: true, // ✅ initial message is ephemeral
+      ephemeral: true,
     });
   },
 
@@ -47,19 +47,19 @@ module.exports = {
 
     // ✅ YES: collect CJS ID in public message
     if (customId === 'yes_registered') {
-      await interaction.update({ components: [] }); // don't change content or ephemeral
+      await interaction.update({ components: [] });
 
       const promptMessage = await interaction.followUp({
         content: '🔑 Please enter your CJS User ID (not Discord ID) below in this channel:',
-        ephemeral: false, // ✅ THIS is what makes it public
+        ephemeral: false,
       });
 
       console.log('🧭 Collector will listen in:');
-      console.log(`   Interaction channel ID: ${interaction.channel?.id}`);
-      console.log(`   Interaction channel name: ${interaction.channel?.name}`);
+      console.log(`   Channel ID: ${promptMessage.channel?.id}`);
+      console.log(`   Channel Name: ${promptMessage.channel?.name}`);
 
       const filter = m => m.author.id === interaction.user.id;
-      const collector = interaction.channel.createMessageCollector({ filter, max: 1, time: 60000 });
+      const collector = promptMessage.channel.createMessageCollector({ filter, max: 1, time: 60000 });
 
       collector.on('collect', async (msg) => {
         console.log(`📥 Collected message: "${msg.content}" from ${msg.author.tag}`);
