@@ -13,9 +13,14 @@ if (!process.env.DISCORD_TOKEN) {
 console.log('✅ Discord token: [loaded]');
 console.log('🚀 Starting bot...');
 
-// Create client with desired intents
+// Create client with required intents
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent, // ✅ This is critical to collect user input
+    GatewayIntentBits.DirectMessages,
+  ],
 });
 
 // Collection for slash commands
@@ -75,6 +80,11 @@ for (const file of eventFiles) {
     console.error(`❌ Error loading event file "${file}":`, error);
   }
 }
+
+// === Log all messages for debugging ===
+client.on('messageCreate', msg => {
+  console.log(`[💬] Message in #${msg.channel?.name || 'DM'} from ${msg.author.tag}: ${msg.content}`);
+});
 
 // === Login to Discord ===
 client.login(process.env.DISCORD_TOKEN)
