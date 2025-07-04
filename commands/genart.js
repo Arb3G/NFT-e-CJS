@@ -38,38 +38,50 @@ module.exports = {
             .setStyle(ButtonStyle.Secondary),
         ),
       ],
-      ephemeral: false,
+      ephemeral: false, // ⬅️ Ensures collector can see public replies
     });
   },
 
   async handleButton(interaction) {
     const { customId } = interaction;
 
-    // ✅ YES: collect CJS ID in public message
+    // ✅ YES: CJS ID in public channel
     if (customId === 'yes_registered') {
       await interaction.update({ components: [] });
 
       const promptMessage = await interaction.followUp({
-        content: '🔑 Please enter your CJS User ID (not Discord ID) below in this channel:',
+        content: '🔑 Please enter your **CJS User ID** (not Discord ID) in this channel:',
         ephemeral: false,
       });
 
-      console.log('🧭 Collector will listen in:');
-      console.log(`   Channel ID: ${promptMessage.channel?.id}`);
-      console.log(`   Channel Name: ${promptMessage.channel?.name}`);
+      // Logging collector setup
+      const interactionChannel = interaction.channel;
+      const userId = interaction.user.id;
+      const username = interaction.user.tag;
 
-      const filter = m => m.author.id === interaction.user.id;
-      const collector = promptMessage.channel.createMessageCollector({ filter, max: 1, time: 60000 });
+      console.log('📍 Collector setup:');
+      console.log(`   Channel Name: ${interactionChannel?.name}`);
+      console.log(`   Channel ID:   ${interactionChannel?.id}`);
+      console.log(`   Expecting message from: ${username} (${userId})`);
+
+      const filter = (m) => {
+        console.log(`🔎 Saw message from ${m.author.tag} in ${m.channel?.name} (${m.channel?.id}): "${m.content}"`);
+        return m.author.id === userId;
+      };
+
+      const collector = interactionChannel.createMessageCollector({
+        filter,
+        max: 1,
+        time: 60000,
+      });
 
       collector.on('collect', async (msg) => {
-        console.log(`📥 Collected message: "${msg.content}" from ${msg.author.tag}`);
-        console.log(`   Message channel ID: ${msg.channel?.id}`);
-        console.log(`   Message channel name: ${msg.channel?.name}`);
+        console.log(`✅ Message collected: "${msg.content}" from ${msg.author.tag}`);
 
         const raw = msg.content;
-        const userId = raw.replace(/<@!?(\d+)>/g, '').trim();
+        const cleanUserId = raw.replace(/<@!?(\d+)>/g, '').trim();
 
-        if (!/^[a-zA-Z0-9_-]{3,30}$/.test(userId)) {
+        if (!/^[a-zA-Z0-9_-]{3,30}$/.test(cleanUserId)) {
           await msg.channel.send(
             '❌ Invalid CJS ID. It must be 3–30 characters long and contain only letters, numbers, `_`, or `-`.'
           );
@@ -84,7 +96,7 @@ module.exports = {
 
         await msg.channel.send(`✅ Thanks, ${interaction.user.username}. Verifying your registration...`);
 
-        const result = await runGenartFlow(userId, async (response) => {
+        const result = await runGenartFlow(cleanUserId, async (response) => {
           await msg.channel.send(response);
         });
 
@@ -94,8 +106,8 @@ module.exports = {
       });
 
       collector.on('end', async (collected, reason) => {
+        console.log(`📴 Collector ended. Reason: ${reason}. Collected: ${collected.size}`);
         if (collected.size === 0) {
-          console.warn('🛑 No message collected from user');
           await interaction.followUp({
             content: '⏰ You took too long. Please run `/genart` again.',
             ephemeral: true,
