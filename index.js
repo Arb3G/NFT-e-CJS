@@ -1,10 +1,7 @@
-//index.js
-// index.js
 const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Collection, GatewayIntentBits } = require('discord.js');
 
-// Check for Discord token early
 if (!process.env.DISCORD_TOKEN) {
   console.error('❌ ERROR: DISCORD_TOKEN environment variable not set.');
   process.exit(1);
@@ -13,17 +10,16 @@ if (!process.env.DISCORD_TOKEN) {
 console.log('✅ Discord token: [loaded]');
 console.log('🚀 Starting bot...');
 
-// Create client with required intents
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent, // ✅ This is critical to collect user input
+    GatewayIntentBits.MessageContent,
     GatewayIntentBits.DirectMessages,
   ],
+  partials: ['CHANNEL'], // needed for DMs
 });
 
-// Collection for slash commands
 client.commands = new Collection();
 
 // === Load Commands ===
@@ -31,10 +27,8 @@ const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
 console.log(`📁 Found ${commandFiles.length} command file(s).`);
-
 for (const file of commandFiles) {
   const filePath = path.join(commandsPath, file);
-
   try {
     const command = require(filePath);
     if ('data' in command && 'execute' in command) {
@@ -53,13 +47,10 @@ const eventsPath = path.join(__dirname, 'events');
 const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
 
 console.log(`📁 Found ${eventFiles.length} event file(s).`);
-
 for (const file of eventFiles) {
   const filePath = path.join(eventsPath, file);
-
   try {
     const event = require(filePath);
-
     if (!event.name || !event.execute) {
       console.warn(`⚠️ Skipped invalid event file: ${file}`);
       continue;
@@ -81,9 +72,28 @@ for (const file of eventFiles) {
   }
 }
 
-// === Log all messages for debugging ===
+// === Interaction Logging ===
+client.on('interactionCreate', interaction => {
+  if (interaction.isChatInputCommand()) {
+    console.log(`⚡ Slash command: /${interaction.commandName} from ${interaction.user.tag}`);
+  }
+  if (interaction.isButton()) {
+    console.log(`🔘 Button pressed: ${interaction.customId} by ${interaction.user.tag}`);
+  }
+  if (interaction.isModalSubmit()) {
+    console.log(`📝 Modal submitted: ${interaction.customId} by ${interaction.user.tag}`);
+  }
+});
+
+// === 🧪 Log ALL incoming messages (DMs + Server)
 client.on('messageCreate', msg => {
-  console.log(`[💬] Message in #${msg.channel?.name || 'DM'} from ${msg.author.tag}: ${msg.content}`);
+  const isDM = msg.channel.type === 1 || msg.channel.type === 'DM';
+
+  console.log(`📨 Message received:`);
+  console.log(`   Author: ${msg.author.tag} (${msg.author.id})`);
+  console.log(`   Channel: ${isDM ? 'DM' : `#${msg.channel.name} (${msg.channel.id})`}`);
+  console.log(`   Guild: ${msg.guild ? `${msg.guild.name} (${msg.guild.id})` : 'Direct Message'}`);
+  console.log(`   Content: "${msg.content}"`);
 });
 
 // === Login to Discord ===
