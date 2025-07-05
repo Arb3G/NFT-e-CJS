@@ -4,9 +4,10 @@
   "description": "A Discord bot that generates AI art with token gating and NFT minting",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "deploy-commands": "node deploy-commands.js",
-    "start-server": "node server.js"
+  "start": "node index.js",
+  "deploy-commands": "node deploy-commands.js",
+  "start-server": "node server.js",
+  "start-all": "concurrently \"npm run start\" \"npm run start-server\""
   },
   "author": "Your Name",
   "license": "MIT",
