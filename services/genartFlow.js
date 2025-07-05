@@ -1,5 +1,6 @@
 // services/genartFlow.js
 const QRCode = require('qrcode');
+const { AttachmentBuilder } = require('discord.js');
 const { getUser } = require('./db');
 const { checkCJSBalance } = require('./tokenCheck');
 const { startPaymentMonitor } = require('./paymentMonitor');
@@ -9,9 +10,9 @@ const PAYMENT_AMOUNT = '10';
 /**
  * Runs the genart user flow: verifies user, checks balance, shows QR, monitors payment.
  * @param {string} userId - CJS user ID
- * @param {function} send - Function to output messages (console.log or Discord reply)
+ * @param {function} send - Function to output messages (must support { content, ephemeral, files })
  * @param {object} [options]
- * @param {boolean} [options.qrDataURL=true] - If true, returns QR image data URL
+ * @param {boolean} [options.qrDataURL=true]
  * @returns {Promise<object>} status and metadata
  */
 async function runGenartFlow(userId, send, options = {}) {
@@ -19,27 +20,33 @@ async function runGenartFlow(userId, send, options = {}) {
   const user = await getUser(userId);
 
   if (!user) {
-    await send(`❗ No wallet found for ID \`${userId}\`. Please register first.`);
+    await send({
+      content: `❗ No wallet found for ID \`${userId}\`. Please register first.`,
+      ephemeral: true,
+    });
     return { success: false, reason: 'no_user' };
   }
 
   const balance = await checkCJSBalance(user.public_key);
   if (balance < 10) {
-    await send(
-      `💸 You need at least **10 $CJS** in your wallet.\n` +
-      `Current balance: **${balance}**\n` +
-      `Top up here: [https://yourdomain.com/buycjs](#)`
-    );
+    await send({
+      content:
+        `💸 You need at least **10 $CJS** in your wallet.\n` +
+        `Current balance: **${balance}**\n` +
+        `Top up here: [https://yourdomain.com/buycjs](#)`,
+      ephemeral: true,
+    });
     return { success: false, reason: 'insufficient_balance' };
   }
 
-  // Required payment info from environment
-  const TREASURY_PUBLIC_KEY = process.env.TREASURY_PUBLIC_KEY; // ** using the below for now, update to actual TREASURY in the future ***
-  //const TREASURY_PUBLIC_KEY = process.env.STELLAR_ISSUER_ADDRESS;
+  const TREASURY_PUBLIC_KEY = process.env.TREASURY_PUBLIC_KEY;
   const STELLAR_ISSUER_ADDRESS = process.env.STELLAR_ISSUER_ADDRESS;
 
   if (!TREASURY_PUBLIC_KEY || !STELLAR_ISSUER_ADDRESS) {
-    await send('❌ Server config error: Payment system not properly set up.');
+    await send({
+      content: '❌ Server config error: Payment system not properly set up.',
+      ephemeral: true,
+    });
     return { success: false, reason: 'config_error' };
   }
 
@@ -51,26 +58,38 @@ async function runGenartFlow(userId, send, options = {}) {
     `&memo=${encodeURIComponent(memo)}`;
 
   let qrCodeDataUrl = null;
+  let attachment = null;
+
   if (qrDataURL) {
     qrCodeDataUrl = await QRCode.toDataURL(paymentURI);
+    const base64Data = qrCodeDataUrl.replace(/^data:image\/png;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    attachment = new AttachmentBuilder(buffer, { name: 'payment_qr.png' });
   }
 
-  await send(
-    `✅ You're verified and funded!\n\n` +
-    `🧾 Please send **${PAYMENT_AMOUNT} $CJS** to proceed using the QR or link below:\n` +
-    `${paymentURI}\n\n` +
-    `Monitoring for payment for up to 90 seconds...`
-  );
+  await send({
+    content:
+      `✅ You're verified and funded!\n\n` +
+      `🧾 Send **${PAYMENT_AMOUNT} $CJS** using this QR code or link:\n` +
+      `${paymentURI}\n\n` +
+      `Monitoring for payment for up to 90 seconds...`,
+    files: attachment ? [attachment] : [],
+    ephemeral: true,
+  });
 
   const confirmed = await startPaymentMonitor(user.public_key, PAYMENT_AMOUNT, memo, 90000);
   if (!confirmed.success) {
-    await send(`❌ Payment not received. Please try again later.`);
+    await send({
+      content: `❌ Payment not received. Please try again later.`,
+      ephemeral: true,
+    });
     return { success: false, reason: 'payment_timeout' };
   }
 
-  await send(
-    `🎨 Payment received! Describe your art idea (e.g., *"Afrofuturist utopia on Mars"*).`
-  );
+  await send({
+    content: `🎨 Payment received! Describe your art idea (e.g., *"Afrofuturist utopia on Mars"*)`,
+    ephemeral: true,
+  });
 
   return { success: true, qr: qrCodeDataUrl, paymentURI };
 }
