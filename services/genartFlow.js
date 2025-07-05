@@ -57,6 +57,9 @@ async function runGenartFlow(userId, send, options = {}) {
     `&asset_issuer=${STELLAR_ISSUER_ADDRESS}` +
     `&memo=${encodeURIComponent(memo)}`;
 
+  const encoded = encodeURIComponent(paymentURI);
+  const redirectLink = `https://yourdomain.com/pay?uri=${encoded}`;
+
   let qrCodeDataUrl = null;
   let attachment = null;
 
@@ -71,7 +74,7 @@ async function runGenartFlow(userId, send, options = {}) {
     content:
       `✅ You're verified and funded!\n\n` +
       `🧾 Send **${PAYMENT_AMOUNT} $CJS** using this QR code or link:\n` +
-      `${paymentURI}\n\n` +
+      `${redirectLink}\n\n` +
       `Monitoring for payment for up to 90 seconds...`,
     files: attachment ? [attachment] : [],
     ephemeral: true,
