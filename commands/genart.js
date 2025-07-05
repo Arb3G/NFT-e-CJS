@@ -38,14 +38,14 @@ module.exports = {
             .setStyle(ButtonStyle.Secondary),
         ),
       ],
-      ephemeral: false, // ⬅️ Ensures collector can see public replies
+      ephemeral: false,
     });
   },
 
   async handleButton(interaction) {
     const { customId } = interaction;
 
-    // ✅ YES: CJS ID in public channel
+    // ✅ YES: public CJS ID input
     if (customId === 'yes_registered') {
       await interaction.update({ components: [] });
 
@@ -54,7 +54,6 @@ module.exports = {
         ephemeral: false,
       });
 
-      // Logging collector setup
       const interactionChannel = interaction.channel;
       const userId = interaction.user.id;
       const username = interaction.user.tag;
@@ -65,7 +64,7 @@ module.exports = {
       console.log(`   Expecting message from: ${username} (${userId})`);
 
       const filter = (m) => {
-        console.log(`🔎 Saw message from ${m.author.tag} in ${m.channel?.name} (${m.channel?.id}): "${m.content}"`);
+        console.log(`🔎 Saw message from ${m.author.tag} in ${m.channel?.name}: "${m.content}"`);
         return m.author.id === userId;
       };
 
@@ -76,7 +75,7 @@ module.exports = {
       });
 
       collector.on('collect', async (msg) => {
-        console.log(`✅ Message collected: "${msg.content}" from ${msg.author.tag}`);
+        console.log(`✅ Collected message: "${msg.content}" from ${msg.author.tag}`);
 
         const raw = msg.content;
         const cleanUserId = raw.replace(/<@!?(\d+)>/g, '').trim();
@@ -96,8 +95,13 @@ module.exports = {
 
         await msg.channel.send(`✅ Thanks, ${interaction.user.username}. Verifying your registration...`);
 
+        // Updated flow: use ephemeral followUps
         const result = await runGenartFlow(cleanUserId, async (response) => {
-          await msg.channel.send(response);
+          if (typeof response === 'string') {
+            await interaction.followUp({ content: response, ephemeral: true });
+          } else {
+            await interaction.followUp({ ...response, ephemeral: true });
+          }
         });
 
         if (!result.success) {
@@ -116,7 +120,7 @@ module.exports = {
       });
     }
 
-    // ❌ NO: open registration modal
+    // ❌ NO: open modal registration
     if (customId === 'no_not_registered') {
       const modal = new ModalBuilder()
         .setCustomId('register_modal')
@@ -143,3 +147,4 @@ module.exports = {
     }
   },
 };
+
