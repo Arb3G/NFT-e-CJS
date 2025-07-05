@@ -5,9 +5,7 @@
   "main": "index.js",
   "scripts": {
   "start": "node index.js",
-  "deploy-commands": "node deploy-commands.js",
-  "start-server": "node server.js",
-  "start-all": "concurrently \"npm run start\" \"npm run start-server\""
+  "deploy-commands": "node deploy-commands.js"
   },
   "author": "Your Name",
   "license": "MIT",
