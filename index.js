@@ -131,3 +131,21 @@ client.on('error', err => {
 client.on('warn', warning => {
   console.warn('⚠️ Discord client warning:', warning);
 });
+
+// === Middleware ===
+app.use(express.json()); // to support JSON-encoded bodies
+app.use(express.urlencoded({ extended: true })); // to support URL-encoded bodies
+
+// Routes
+app.use('/', require('./routes/redirect'));
+
+// Basic health check endpoint
+app.get('/', (req, res) => {
+  res.send('🤖 Discord Bot & Web Server Running!');
+});
+
+// Start web server
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🌐 Web server running on port ${PORT}`);
+  console.log(`🔗 Redirect endpoint available at /pay`);
+});
