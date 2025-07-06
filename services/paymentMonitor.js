@@ -1,9 +1,7 @@
 // services/paymentMonitor.js
-// services/paymentMonitor.js
 const fetch = require('node-fetch');
 const dayjs = require('dayjs');
 
-// Countdown helper to display wait time
 function countdown(seconds) {
   return new Promise(resolve => {
     const interval = setInterval(() => {
@@ -18,7 +16,6 @@ function countdown(seconds) {
   });
 }
 
-// Fetch JSON helper with error handling
 async function fetchJSON(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status} for URL: ${url}`);
@@ -26,15 +23,49 @@ async function fetchJSON(url) {
 }
 
 /**
+ * If transaction hash is already known, verify payment directly.
+ */
+async function verifyPaymentByHash(txHash, expectedTo, expectedAmount) {
+  const HORIZON = process.env.HORIZON_URL || 'https://horizon.stellar.org';
+  const CJS_ASSET_CODE = process.env.CJS_ASSET_CODE;
+  const CJS_ISSUER = process.env.STELLAR_ISSUER_ADDRESS;
+
+  try {
+    const txData = await fetchJSON(`${HORIZON}/transactions/${txHash}`);
+    const opsData = await fetchJSON(`${HORIZON}/transactions/${txHash}/operations`);
+
+    const matchingPayment = opsData._embedded.records.find(op =>
+      op.type === 'payment' &&
+      op.asset_code === CJS_ASSET_CODE &&
+      op.asset_issuer === CJS_ISSUER &&
+      op.to === expectedTo &&
+      op.amount === expectedAmount
+    );
+
+    if (matchingPayment) {
+      console.log(`✅ Verified payment in tx ${txHash}`);
+      return {
+        success: true,
+        hash: txHash,
+        amount: matchingPayment.amount,
+        memo: txData.memo,
+        timestamp: matchingPayment.created_at,
+      };
+    } else {
+      console.log(`❌ Payment in tx ${txHash} did not match criteria.`);
+      return { success: false, reason: 'No matching operation found.' };
+    }
+
+  } catch (err) {
+    console.error('❌ Error verifying transaction:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
  * Poll Stellar Horizon for payments to PUBLIC_KEY matching the memoId.
- * @param {string} publicKey - Recipient's wallet (usually treasury)
- * @param {string} amount - Expected token amount (as string)
- * @param {string} memoId - The memo ID to match
- * @param {number} timeoutMs - Max duration to wait (default 90000ms)
- * @returns {Promise<object>} Result object with success info or failure reason.
  */
 async function startPaymentMonitor(publicKey, amount, memoId, timeoutMs = 90000) {
-  // Pull config lazily
   const HORIZON = process.env.HORIZON_URL || 'https://horizon.stellar.org';
   const CJS_ASSET_CODE = process.env.CJS_ASSET_CODE;
   const CJS_ISSUER = process.env.STELLAR_ISSUER_ADDRESS;
@@ -45,10 +76,20 @@ async function startPaymentMonitor(publicKey, amount, memoId, timeoutMs = 90000)
     throw new Error('Missing required environment variables: PUBLIC_KEY, CJS_ASSET_CODE, or CJS_ISSUER.');
   }
 
+  console.log(`🧪 ENV:`, {
+    CJS_ASSET_CODE,
+    CJS_ISSUER,
+    POLL_INTERVAL,
+    HORIZON,
+  });
+
   let attempt = 0;
   let lastSeenTx = null;
 
   console.log(`📡 Monitoring payments to ${publicKey} for memo: "${memoId}"`);
+
+  // Optional: wait 5s before first poll to give Horizon time
+  await countdown(5);
 
   while (attempt < MAX_ATTEMPTS) {
     attempt++;
@@ -67,7 +108,18 @@ async function startPaymentMonitor(publicKey, amount, memoId, timeoutMs = 90000)
           record.to === publicKey
         ) {
           const txData = await fetchJSON(`${HORIZON}/transactions/${record.transaction_hash}`);
-          if (txData.memo === memoId && record.transaction_hash !== lastSeenTx) {
+
+          // Debug unmatched memo
+          if (txData.memo !== memoId) {
+            console.log(`🟡 Skipping tx ${record.transaction_hash} — memo mismatch: got "${txData.memo}"`);
+            continue;
+          }
+
+          if (
+            txData.memo_type === 'text' &&
+            txData.memo === memoId &&
+            record.transaction_hash !== lastSeenTx
+          ) {
             lastSeenTx = record.transaction_hash;
 
             console.log(`✅ Received ${record.amount} ${CJS_ASSET_CODE} at ${dayjs(record.created_at).format()}`);
@@ -80,6 +132,12 @@ async function startPaymentMonitor(publicKey, amount, memoId, timeoutMs = 90000)
               timestamp: record.created_at,
             };
           }
+        } else {
+          console.log('🔕 Ignoring non-matching payment:', {
+            type: record.type,
+            asset_code: record.asset_code,
+            to: record.to,
+          });
         }
       }
 
@@ -96,4 +154,4 @@ async function startPaymentMonitor(publicKey, amount, memoId, timeoutMs = 90000)
   return { success: false, timeout: true };
 }
 
-module.exports = { startPaymentMonitor };
+module.exports = { startPaymentMonitor, verifyPaymentByHash };
