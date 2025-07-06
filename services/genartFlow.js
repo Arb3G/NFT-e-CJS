@@ -75,7 +75,7 @@ async function runGenartFlow(userId, send, options = {}) {
       `✅ You're verified and funded!\n\n` +
       `🧾 Send **${PAYMENT_AMOUNT} $CJS** using this QR code or link:\n` +
       `${redirectLink}\n\n` +
-      `Monitoring for payment for up to 90 seconds...`,
+      `Monitoring for payment for up to 180 seconds...`,
     files: attachment ? [attachment] : [],
     ephemeral: true,
   });
