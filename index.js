@@ -1,16 +1,22 @@
+c// === Express Web Server Setup ===
 const express = require('express');
 const app = express();
 
+// Redirect route for Stellar payment
 const redirectRoute = require('./routes/redirect');
 app.use('/', redirectRoute);
 
-const PORT = process.env.PORT || 3000;
+// Optional: Basic root route to avoid "Cannot GET /"
+app.get('/', (req, res) => {
+  res.send('✅ Discord bot and web server are running.');
+});
 
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🌐 Express server running at http://localhost:${PORT}`);
 });
 
-
+// === Discord Bot Setup ===
 const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Collection, GatewayIntentBits } = require('discord.js');
@@ -21,7 +27,7 @@ if (!process.env.DISCORD_TOKEN) {
 }
 
 console.log('✅ Discord token: [loaded]');
-console.log('🚀 Starting bot...');
+console.log('🚀 Starting Discord bot...');
 
 const client = new Client({
   intents: [
@@ -98,7 +104,7 @@ client.on('interactionCreate', interaction => {
   }
 });
 
-// === 🧪 Log ALL incoming messages (DMs + Server)
+// === Log ALL Messages (DMs and Servers)
 client.on('messageCreate', msg => {
   const isDM = msg.channel.type === 1 || msg.channel.type === 'DM';
 
@@ -111,9 +117,9 @@ client.on('messageCreate', msg => {
 
 // === Login to Discord ===
 client.login(process.env.DISCORD_TOKEN)
-  .then(() => console.log('📡 Login request sent to Discord.'))
+  .then(() => console.log('📡 Discord bot logged in and ready.'))
   .catch(error => {
-    console.error('❌ Login failed:', error);
+    console.error('❌ Discord login failed:', error);
     process.exit(1);
   });
 
