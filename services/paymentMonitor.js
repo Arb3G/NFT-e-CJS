@@ -38,7 +38,7 @@ async function startPaymentMonitor(publicKey, amount, memoId, timeoutMs = 90000)
   const HORIZON = process.env.HORIZON_URL || 'https://horizon.stellar.org';
   const CJS_ASSET_CODE = process.env.CJS_ASSET_CODE;
   const CJS_ISSUER = process.env.STELLAR_ISSUER_ADDRESS;
-  const POLL_INTERVAL = Number(process.env.POLL_INTERVAL_MS) || 30000;
+  const POLL_INTERVAL = Number(process.env.POLL_INTERVAL_MS) || 60000;
   const MAX_ATTEMPTS = Math.ceil(timeoutMs / POLL_INTERVAL);
 
   if (!publicKey || !CJS_ASSET_CODE || !CJS_ISSUER) {
