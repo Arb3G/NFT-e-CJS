@@ -75,12 +75,14 @@ async function runGenartFlow(userId, send, options = {}) {
       `✅ You're verified and funded!\n\n` +
       `🧾 Send **${PAYMENT_AMOUNT} $CJS** using this QR code or link:\n` +
       `${redirectLink}\n\n` +
-      `Monitoring for payment for up to 180 seconds...`,
+      `Monitoring for payment for up to 90 seconds...`,
     files: attachment ? [attachment] : [],
     ephemeral: true,
   });
 
-  const confirmed = await startPaymentMonitor(user.public_key, PAYMENT_AMOUNT, memo, 90000);
+  // 🛠️ FIXED: Monitor treasury (not user) for matching memo
+  const confirmed = await startPaymentMonitor(TREASURY_PUBLIC_KEY, PAYMENT_AMOUNT, memo, 90000);
+
   if (!confirmed.success) {
     await send({
       content: `❌ Payment not received. Please try again later.`,
@@ -90,11 +92,17 @@ async function runGenartFlow(userId, send, options = {}) {
   }
 
   await send({
-    content: `🎨 Payment received! Describe your art idea (e.g., *"Afrofuturist utopia on Mars"*)`,
+    content: `🎨 Payment received!\nDescribe your art idea (e.g., *"Afrofuturist utopia on Mars"*)`,
     ephemeral: true,
   });
 
-  return { success: true, qr: qrCodeDataUrl, paymentURI };
+  return {
+    success: true,
+    qr: qrCodeDataUrl,
+    paymentURI,
+    txHash: confirmed.hash,
+    timestamp: confirmed.timestamp,
+  };
 }
 
 module.exports = { runGenartFlow };
