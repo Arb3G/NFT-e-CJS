@@ -1,3 +1,16 @@
+const express = require('express');
+const app = express();
+
+const redirectRoute = require('./routes/redirect');
+app.use('/', redirectRoute);
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`🌐 Express server running at http://localhost:${PORT}`);
+});
+
+
 const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Collection, GatewayIntentBits } = require('discord.js');
