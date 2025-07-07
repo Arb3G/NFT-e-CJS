@@ -50,12 +50,14 @@ async function runGenartFlow(userId, send, options = {}) {
     return { success: false, reason: 'config_error' };
   }
 
-  const memo = `genart-${userId}`;
+  // ✅ Generate a unique memo for this session
+  const memo = `genart-${userId}-${Date.now()}`;
   const paymentURI = `web+stellar:pay?destination=${TREASURY_PUBLIC_KEY}` +
     `&amount=${PAYMENT_AMOUNT}` +
     `&asset_code=CJS` +
     `&asset_issuer=${STELLAR_ISSUER_ADDRESS}` +
-    `&memo=${encodeURIComponent(memo)}`;
+    `&memo=${encodeURIComponent(memo)}` +
+    `&memo_type=TEXT`;
 
   const encoded = encodeURIComponent(paymentURI);
   const redirectLink = `https://yourdomain.com/pay?uri=${encoded}`;
@@ -80,8 +82,15 @@ async function runGenartFlow(userId, send, options = {}) {
     ephemeral: true,
   });
 
-  // 🛠️ FIXED: Monitor treasury (not user) for matching memo
-  const confirmed = await startPaymentMonitor(TREASURY_PUBLIC_KEY, PAYMENT_AMOUNT, memo, 90000);
+  const flowStartTime = new Date();
+
+  const confirmed = await startPaymentMonitor(
+    TREASURY_PUBLIC_KEY,
+    PAYMENT_AMOUNT,
+    memo,
+    90000,
+    flowStartTime
+  );
 
   if (!confirmed.success) {
     await send({
@@ -92,7 +101,10 @@ async function runGenartFlow(userId, send, options = {}) {
   }
 
   await send({
-    content: `🎨 Payment received!\nDescribe your art idea (e.g., *"Afrofuturist utopia on Mars"*)`,
+    content:
+      `🎨 Payment received!\n` +
+      `🧾 Memo: \`${memo}\`\n\n` +
+      `Now describe your art idea (e.g., *"Afrofuturist utopia on Mars"*)`,
     ephemeral: true,
   });
 
@@ -102,6 +114,7 @@ async function runGenartFlow(userId, send, options = {}) {
     paymentURI,
     txHash: confirmed.hash,
     timestamp: confirmed.timestamp,
+    memo, // included for logging or further processing
   };
 }
 
