@@ -12,8 +12,6 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
  * Fetch a single user by userId from 'users' table.
- * @param {string} userId - The user ID to query.
- * @returns {Promise<Object|null>} User object or null if not found or on error.
  */
 async function getUser(userId) {
   try {
@@ -24,7 +22,6 @@ async function getUser(userId) {
       .single();
 
     if (error && status !== 406) {
-      // 406 means no rows found in single()
       console.error(`getUser error (status ${status}):`, error.message);
       return null;
     }
@@ -38,9 +35,6 @@ async function getUser(userId) {
 
 /**
  * Add or update a user in the 'users' table.
- * @param {string} userId
- * @param {string} publicKey
- * @returns {Promise<Object|null>} Upserted user data or null on error.
  */
 async function addUser(userId, publicKey) {
   try {
@@ -63,4 +57,34 @@ async function addUser(userId, publicKey) {
   }
 }
 
-module.exports = { getUser, addUser };
+/**
+ * Logs a CJS token purchase into the 'purchases' table.
+ * @param {string} userId - The user's ID
+ * @param {string|number} amount - Amount purchased
+ * @param {string} originating - Source of the purchase (e.g. "Crypto Wallet")
+ * @returns {Promise<boolean>} true if successful, false on failure
+ */
+async function logPurchase(userId, amount, originating = 'Crypto Wallet') {
+  try {
+    const { error } = await supabase.from('purchases').insert([
+      {
+        user_id: userId,
+        amount,
+        originating,
+        purchased_at: new Date().toISOString(),
+      },
+    ]);
+
+    if (error) {
+      console.error('logPurchase error:', error.message);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Unexpected logPurchase error:', err.message);
+    return false;
+  }
+}
+
+module.exports = { getUser, addUser, logPurchase };
