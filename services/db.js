@@ -64,13 +64,14 @@ async function addUser(userId, publicKey) {
  * @param {string} originating - Source of the purchase (e.g. "Crypto Wallet")
  * @returns {Promise<boolean>} true if successful, false on failure
  */
-async function logPurchase(userId, amount, originating = 'Crypto Wallet') {
+async function logPurchase(userId, amount, originating = 'Crypto Wallet', memo = null) {
   try {
     const { error } = await supabase.from('purchases').insert([
       {
         user_id: userId,
         amount,
         originating,
+        memo,                  // Add memo here for tracking
         purchased_at: new Date().toISOString(),
       },
     ]);
@@ -86,5 +87,6 @@ async function logPurchase(userId, amount, originating = 'Crypto Wallet') {
     return false;
   }
 }
+
 
 module.exports = { getUser, addUser, logPurchase };
