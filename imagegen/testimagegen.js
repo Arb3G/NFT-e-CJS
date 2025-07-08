@@ -1,8 +1,9 @@
 const fetch = require('node-fetch');
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
 
 async function callGenerate(prompt) {
   try {
-    const response = await fetch('https://<your-project>.supabase.co/functions/v1/generate', {
+    const response = await fetch('https://mxjogmsxszgtrpqszlln.supabase.co/functions/v1/genA', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
