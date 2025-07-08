@@ -1,14 +1,12 @@
 const fetch = require('node-fetch');
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'your-anon-key-here';
 
 async function callGenerate(prompt) {
   try {
-    const response = await fetch('https://mxjogmsxszgtrpqszlln.supabase.co/functions/v1/genA', {
+    const response = await fetch('https://<your-project>.supabase.co/functions/v1/generate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Optional: add Supabase anon/public key if you use RLS or auth
-        // 'Authorization': 'Bearer YOUR_SUPABASE_ANON_KEY',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
       },
       body: JSON.stringify({ prompt }),
     });
