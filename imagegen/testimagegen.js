@@ -1,5 +1,5 @@
 const fetch = require('node-fetch');
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
 async function callGenerate(prompt) {
   try {
@@ -18,6 +18,8 @@ async function callGenerate(prompt) {
     }
 
     const data = await response.json();
+    console.log("🧾 Full response from Supabase:", JSON.stringify(data, null, 2)); // 🔍 Debug print
+
     return data.reply;
   } catch (err) {
     console.error('❌ Error calling generate:', err);
