@@ -1,4 +1,5 @@
 const fetch = require('node-fetch');
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'your-anon-key-here';
 
 async function callGenerate(prompt) {
   try {
