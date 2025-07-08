@@ -1,4 +1,3 @@
-//commands/genart.js
 const {
   SlashCommandBuilder,
   ActionRowBuilder,
@@ -10,6 +9,7 @@ const {
 } = require('discord.js');
 
 const { runGenartFlow } = require('../services/genartFlow');
+const { generateArt } = require('../services/replicate'); // your Replicate API wrapper
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -45,38 +45,22 @@ module.exports = {
   async handleButton(interaction) {
     const { customId } = interaction;
 
-    // ✅ YES: public CJS ID input
     if (customId === 'yes_registered') {
       await interaction.update({ components: [] });
 
-      const promptMessage = await interaction.followUp({
+      await interaction.followUp({
         content: '🔑 Please enter your **CJS User ID** (not Discord ID) in this channel:',
         ephemeral: false,
       });
 
-      const interactionChannel = interaction.channel;
-      const userId = interaction.user.id;
-      const username = interaction.user.tag;
-
-      console.log('📍 Collector setup:');
-      console.log(`   Channel Name: ${interactionChannel?.name}`);
-      console.log(`   Channel ID:   ${interactionChannel?.id}`);
-      console.log(`   Expecting message from: ${username} (${userId})`);
-
-      const filter = (m) => {
-        console.log(`🔎 Saw message from ${m.author.tag} in ${m.channel?.name}: "${m.content}"`);
-        return m.author.id === userId;
-      };
-
-      const collector = interactionChannel.createMessageCollector({
+      const filter = (m) => m.author.id === interaction.user.id;
+      const collector = interaction.channel.createMessageCollector({
         filter,
         max: 1,
         time: 60000,
       });
 
       collector.on('collect', async (msg) => {
-        console.log(`✅ Collected message: "${msg.content}" from ${msg.author.tag}`);
-
         const raw = msg.content;
         const cleanUserId = raw.replace(/<@!?(\d+)>/g, '').trim();
 
@@ -89,13 +73,13 @@ module.exports = {
 
         try {
           await msg.delete();
-        } catch (err) {
-          console.warn('⚠️ Could not delete message:', err.message);
+        } catch {
+          // ignore deletion failure
         }
 
-        await msg.channel.send(`✅ Thanks, ${interaction.user.username}. Verifying your registration...`);
+        await msg.channel.send(`✅ Thanks, ${interaction.user.username}. Verifying your registration and payment...`);
 
-        // Updated flow: use ephemeral followUps
+        // Run payment flow
         const result = await runGenartFlow(cleanUserId, async (response) => {
           if (typeof response === 'string') {
             await interaction.followUp({ content: response, ephemeral: true });
@@ -106,21 +90,60 @@ module.exports = {
 
         if (!result.success) {
           console.warn(`❌ GenArt flow failed: ${result.reason}`);
+          return;
         }
+
+        // Payment successful — now collect art prompt
+        await msg.channel.send(
+          `${interaction.user}, 🎨 Payment verified! Please describe your art idea (e.g., *"Afrofuturist utopia on Mars"*).\n` +
+          `You have 2 minutes to reply.`
+        );
+
+        const promptFilter = (m) => m.author.id === interaction.user.id;
+        const promptCollector = interaction.channel.createMessageCollector({
+          filter: promptFilter,
+          max: 1,
+          time: 120000,
+        });
+
+        promptCollector.on('collect', async (promptMsg) => {
+          const prompt = promptMsg.content.trim();
+          await promptMsg.channel.send('🎨 Generating your art... Please wait.');
+
+          try {
+            const imageUrl = await generateArt(prompt);
+
+            if (!imageUrl) {
+              await promptMsg.channel.send('❌ Sorry, I couldn\'t generate the image. Please try again.');
+            } else {
+              await promptMsg.channel.send({ content: `Here is your art for: "${prompt}"`, files: [imageUrl] });
+            }
+          } catch (error) {
+            console.error('Error generating art:', error);
+            await promptMsg.channel.send('❌ Something went wrong while generating your art.');
+          }
+        });
+
+        promptCollector.on('end', async (collected, reason) => {
+          if (collected.size === 0) {
+            await interaction.followUp({
+              content: '⏰ You took too long to respond with your art idea. Please try the command again.',
+              ephemeral: true,
+            });
+          }
+        });
       });
 
       collector.on('end', async (collected, reason) => {
-        console.log(`📴 Collector ended. Reason: ${reason}. Collected: ${collected.size}`);
         if (collected.size === 0) {
           await interaction.followUp({
-            content: '⏰ You took too long. Please run `/genart` again.',
+            content: '⏰ You took too long to provide your CJS User ID. Please run `/genart` again.',
             ephemeral: true,
           });
         }
       });
     }
 
-    // ❌ NO: open modal registration
     if (customId === 'no_not_registered') {
       const modal = new ModalBuilder()
         .setCustomId('register_modal')
@@ -147,4 +170,3 @@ module.exports = {
     }
   },
 };
-
