@@ -9,7 +9,7 @@ const {
 } = require('discord.js');
 
 const { runGenartFlow } = require('../services/genartFlow');
-const { generateArt } = require('../services/replicate'); // your Replicate API wrapper
+const { generateArt } = require('../services/createart'); // your Replicate API wrapper
 
 module.exports = {
   data: new SlashCommandBuilder()
