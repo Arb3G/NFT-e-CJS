@@ -6,6 +6,8 @@ const fs = require('fs');
 //require('dotenv').config();
 
 const tryCraiyon = async (prompt) => {
+  const puppeteer = require('puppeteer');
+
   const browser = await puppeteer.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -17,11 +19,11 @@ const tryCraiyon = async (prompt) => {
     await page.goto('https://www.craiyon.com/', { waitUntil: 'networkidle2' });
     console.log('Craiyon page loaded');
 
-    // Wait for the input field to render
-    await page.waitForSelector('input[placeholder="Enter your prompt"]', { timeout: 15000 });
+    // Wait for the input container (Craiyon uses a div + contenteditable now)
+    await page.waitForSelector('[data-testid="prompt-input"]', { timeout: 30000 });
 
     console.log('Typing prompt:', prompt);
-    await page.type('input[placeholder="Enter your prompt"]', prompt);
+    await page.type('[data-testid="prompt-input"]', prompt);
 
     console.log('Clicking Draw...');
     await page.click('button:has-text("Draw")');
@@ -33,10 +35,11 @@ const tryCraiyon = async (prompt) => {
       'img[src^="data:image/jpeg;base64,"]',
       (img) => img.src
     );
-    const buffer = Buffer.from(base64Image.split(',')[1], 'base64');
 
+    const buffer = Buffer.from(base64Image.split(',')[1], 'base64');
     await browser.close();
-    console.log('✅ Craiyon image generated successfully');
+
+    console.log('✅ Craiyon image retrieved');
     return buffer;
   } catch (err) {
     console.warn('[Craiyon failed]', err.message);
