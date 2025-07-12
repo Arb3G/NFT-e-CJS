@@ -1,9 +1,6 @@
 const puppeteer = require('puppeteer');
-const fetch = require('node-fetch'); // Make sure this is installed: npm i node-fetch
+const fetch = require('node-fetch');
 const fs = require('fs');
-//const open = require('open');
-
-//require('dotenv').config();
 
 const tryCraiyon = async (prompt) => {
   const browser = await puppeteer.launch({
@@ -18,10 +15,8 @@ const tryCraiyon = async (prompt) => {
     await page.goto('https://www.craiyon.com/', { waitUntil: 'domcontentloaded' });
     console.log('Craiyon page loaded');
 
-    // Wait manually using setTimeout fallback
     await new Promise(resolve => setTimeout(resolve, 4000));
 
-    // Click approximately where the prompt box is located
     await page.mouse.click(600, 300);
     await page.keyboard.type(prompt);
 
@@ -54,26 +49,9 @@ const tryCraiyon = async (prompt) => {
   }
 };
 
-
-    const buffer = Buffer.from(base64Image.split(',')[1], 'base64');
-
-    await browser.close();
-    console.log('✅ Craiyon image retrieved');
-    return buffer;
-  } catch (err) {
-    console.warn('[Craiyon failed]', err.message);
-    await page.screenshot({ path: 'craiyon_debug.png' });
-    console.log('📸 Saved debug screenshot as craiyon_debug.png');
-    await browser.close();
-    throw err;
-  }
-};
-
-
-
 const tryHuggingFace = async (prompt) => {
   const HF_TOKEN = process.env.HF_TOKEN;
-  const model = 'black-forest-labs/flux-dev'; // Using black forest flux
+  const model = 'black-forest-labs/flux-dev';
 
   const url = 'https://router.huggingface.co/hyperbolic/v1/images/generations';
 
@@ -101,27 +79,20 @@ const tryHuggingFace = async (prompt) => {
       }),
     });
 
-    // Check if response is successful and contains the image data
-    if (response.ok) {
-      const result = await response.json();
-      
-      // Extract the base64 image string
-      const base64Image = result.images[0].image;
-      const buffer = Buffer.from(base64Image, 'base64');
-
-      // Save image to disk
-      fs.writeFileSync('testoutput.png', buffer);
-      console.log('✅ Image saved as testoutput.png');
-
-      return buffer; // Return the buffer if needed
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API error: ${errorText}`);
     }
 
-    // If it's not an image, log error
-    const errorText = await response.text();
-    const errorJson = JSON.parse(errorText);
-    console.error('🚨 API Error:', errorJson);
-    throw new Error(`Hugging Face API Error: ${errorJson.message || 'Unknown error'}`);
-    
+    const result = await response.json();
+
+    const base64Image = result.images[0].image;
+    const buffer = Buffer.from(base64Image, 'base64');
+
+    fs.writeFileSync('testoutput.png', buffer);
+    console.log('✅ Image saved as testoutput.png');
+
+    return buffer;
   } catch (err) {
     console.warn('[Hugging Face failed]', err.message);
     throw err;
