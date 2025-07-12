@@ -54,6 +54,12 @@ const tryHuggingFace = async (prompt) => {
       body: JSON.stringify({
         prompt: prompt,
         model_name: model,
+        num_images: 1,
+        guidance_scale: 7.5,
+        num_inference_steps: 50,
+        height: 512,
+        width: 512,
+        seed: null
       }),
     });
 
