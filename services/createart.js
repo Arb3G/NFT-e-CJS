@@ -37,7 +37,7 @@ const tryHuggingFace = async (prompt) => {
 
   try {
     const response = await axios.post(
-      `https://api-inference.huggingface.co/models/stabilityai/${model}`,
+      `https://api-inference.huggingface.co/models/${model}`,
       { inputs: prompt },
       {
         headers: {
