@@ -76,7 +76,7 @@ const tryHuggingFace = async (prompt) => {
     fs.writeFileSync('testoutput.png', buffer);
     console.log('✅ Image saved as testoutput.png');
      // 👇 This will auto-open in browser (if supported)
-    await open('testoutput.png');
+    //await open('testoutput.png');
     return buffer;
     
   } catch (err) {
