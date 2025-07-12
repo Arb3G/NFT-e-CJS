@@ -1,5 +1,6 @@
 const puppeteer = require('puppeteer');
 const fetch = require('node-fetch'); // Make sure this is installed: npm i node-fetch
+const fs = require('fs');
 //const open = require('open');
 
 //require('dotenv').config();
