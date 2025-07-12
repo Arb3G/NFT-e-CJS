@@ -39,7 +39,8 @@ const tryCraiyon = async (prompt) => {
 
 const tryHuggingFace = async (prompt) => {
   const HF_TOKEN = process.env.HF_TOKEN;
-  const model = 'SD2';
+  const model = 'SD2'; // Using SD2 model
+
   const url = 'https://router.huggingface.co/hyperbolic/v1/images/generations';
 
   if (!HF_TOKEN) {
@@ -55,29 +56,38 @@ const tryHuggingFace = async (prompt) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        prompt: prompt,
+        prompt,
         model_name: model,
         num_images: 1,
         guidance_scale: 7.5,
         num_inference_steps: 50,
         height: 1024,
         width: 1024,
-        seed: null
+        seed: null,
       }),
     });
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`API Error: ${response.status} - ${error}`);
+    // Check if response is successful and contains the image data
+    if (response.ok) {
+      const result = await response.json();
+      
+      // Extract the base64 image string
+      const base64Image = result.images[0].image;
+      const buffer = Buffer.from(base64Image, 'base64');
+
+      // Save image to disk
+      const fs = require('fs');
+      fs.writeFileSync('testoutput.png', buffer);
+      console.log('✅ Image saved as testoutput.png');
+
+      return buffer; // Return the buffer if needed
     }
 
-    const buffer = Buffer.from(await response.arrayBuffer());
-    //await open(buffer);
-    fs.writeFileSync('testoutput.png', buffer);
-    console.log('✅ Image saved as testoutput.png');
-     // 👇 This will auto-open in browser (if supported)
-    //await open('testoutput.png');
-    return buffer;
+    // If it's not an image, log error
+    const errorText = await response.text();
+    const errorJson = JSON.parse(errorText);
+    console.error('🚨 API Error:', errorJson);
+    throw new Error(`Hugging Face API Error: ${errorJson.message || 'Unknown error'}`);
     
   } catch (err) {
     console.warn('[Hugging Face failed]', err.message);
