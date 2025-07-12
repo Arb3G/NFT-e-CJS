@@ -6,30 +6,34 @@ const fs = require('fs');
 //require('dotenv').config();
 
 const tryCraiyon = async (prompt) => {
-  const puppeteer = require('puppeteer');
-
   const browser = await puppeteer.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
+
   const page = await browser.newPage();
 
   try {
     console.log('Starting Craiyon...');
-    await page.goto('https://www.craiyon.com/', { waitUntil: 'networkidle2' });
+    await page.goto('https://www.craiyon.com/', { waitUntil: 'domcontentloaded' });
     console.log('Craiyon page loaded');
 
-    // Wait for the input container (Craiyon uses a div + contenteditable now)
-    await page.waitForSelector('[data-testid="prompt-input"]', { timeout: 30000 });
+    // Wait for and click into the prompt field manually using coordinates
+    await page.waitForTimeout(4000); // Wait for React to finish rendering
 
-    console.log('Typing prompt:', prompt);
-    await page.type('[data-testid="prompt-input"]', prompt);
+    // Click the center of the page (where the input is located visually)
+    await page.mouse.click(600, 300);
+    await page.keyboard.type(prompt);
 
     console.log('Clicking Draw...');
-    await page.click('button:has-text("Draw")');
+    await page.evaluate(() => {
+      const btns = [...document.querySelectorAll('button')];
+      const drawBtn = btns.find(btn => btn.textContent?.toLowerCase().includes('draw'));
+      if (drawBtn) drawBtn.click();
+    });
 
     console.log('Waiting for image...');
-    await page.waitForSelector('img[src^="data:image/jpeg;base64,"]', { timeout: 60000 });
+    await page.waitForSelector('img[src^="data:image/jpeg;base64,"]', { timeout: 90000 });
 
     const base64Image = await page.$eval(
       'img[src^="data:image/jpeg;base64,"]',
@@ -37,16 +41,19 @@ const tryCraiyon = async (prompt) => {
     );
 
     const buffer = Buffer.from(base64Image.split(',')[1], 'base64');
-    await browser.close();
 
+    await browser.close();
     console.log('✅ Craiyon image retrieved');
     return buffer;
   } catch (err) {
     console.warn('[Craiyon failed]', err.message);
+    await page.screenshot({ path: 'craiyon_debug.png' });
+    console.log('📸 Saved debug screenshot as craiyon_debug.png');
     await browser.close();
     throw err;
   }
 };
+
 
 
 const tryHuggingFace = async (prompt) => {
