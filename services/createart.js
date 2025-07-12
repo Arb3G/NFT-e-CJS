@@ -8,10 +8,7 @@ const fs = require('fs');
 const tryCraiyon = async (prompt) => {
   const browser = await puppeteer.launch({
     headless: true,
-    args: ['--no-sandbox', 
-           '--disable-setuid-sandbox',
-           '--disable-gpu',  // Add this flag to improve performance in some environments
-           '--disable-software-rasterizer'],
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
   const page = await browser.newPage();
 
@@ -20,18 +17,17 @@ const tryCraiyon = async (prompt) => {
     await page.goto('https://www.craiyon.com/', { waitUntil: 'networkidle2' });
     console.log('Craiyon page loaded');
 
+    // Wait for the input field to render
+    await page.waitForSelector('input[placeholder="Enter your prompt"]', { timeout: 15000 });
+
     console.log('Typing prompt:', prompt);
-    await page.type('textarea', prompt);
+    await page.type('input[placeholder="Enter your prompt"]', prompt);
 
     console.log('Clicking Draw...');
     await page.click('button:has-text("Draw")');
-    console.log('Draw button clicked');
 
     console.log('Waiting for image...');
     await page.waitForSelector('img[src^="data:image/jpeg;base64,"]', { timeout: 60000 });
-    console.log('Image found');
-        
-    // Removed the extra closing bracket here
 
     const base64Image = await page.$eval(
       'img[src^="data:image/jpeg;base64,"]',
@@ -40,6 +36,7 @@ const tryCraiyon = async (prompt) => {
     const buffer = Buffer.from(base64Image.split(',')[1], 'base64');
 
     await browser.close();
+    console.log('✅ Craiyon image generated successfully');
     return buffer;
   } catch (err) {
     console.warn('[Craiyon failed]', err.message);
@@ -47,6 +44,7 @@ const tryCraiyon = async (prompt) => {
     throw err;
   }
 };
+
 
 const tryHuggingFace = async (prompt) => {
   const HF_TOKEN = process.env.HF_TOKEN;
