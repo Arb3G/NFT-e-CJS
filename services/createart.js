@@ -36,7 +36,7 @@ const tryCraiyon = async (prompt) => {
 
 const tryHuggingFace = async (prompt) => {
   const HF_TOKEN = process.env.HF_TOKEN;
-  const model = 'stabilityai/stable-diffusion-2';
+  const model = 'SD2';
   const url = 'https://router.huggingface.co/hyperbolic/v1/images/generations';
 
   if (!HF_TOKEN) {
