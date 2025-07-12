@@ -31,7 +31,7 @@ const tryCraiyon = async (prompt) => {
     await page.waitForSelector('img[src^="data:image/jpeg;base64,"]', { timeout: 60000 });
     console.log('Image found');
         
-    });
+    // Removed the extra closing bracket here
 
     const base64Image = await page.$eval(
       'img[src^="data:image/jpeg;base64,"]',
@@ -87,7 +87,6 @@ const tryHuggingFace = async (prompt) => {
       const buffer = Buffer.from(base64Image, 'base64');
 
       // Save image to disk
-      const fs = require('fs');
       fs.writeFileSync('testoutput.png', buffer);
       console.log('✅ Image saved as testoutput.png');
 
@@ -122,5 +121,3 @@ const generateArt = async (prompt) => {
 };
 
 module.exports = generateArt;
-
-
