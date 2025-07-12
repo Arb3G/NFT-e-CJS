@@ -39,7 +39,7 @@ const tryCraiyon = async (prompt) => {
 
 const tryHuggingFace = async (prompt) => {
   const HF_TOKEN = process.env.HF_TOKEN;
-  const model = 'SD2'; // Using SD2 model
+  const model = 'black-forest-labs/flux-dev'; // Using black forest flux
 
   const url = 'https://router.huggingface.co/hyperbolic/v1/images/generations';
 
