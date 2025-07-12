@@ -57,8 +57,8 @@ const tryHuggingFace = async (prompt) => {
         num_images: 1,
         guidance_scale: 7.5,
         num_inference_steps: 50,
-        height: 512,
-        width: 512,
+        height: 1024,
+        width: 1024,
         seed: null
       }),
     });
