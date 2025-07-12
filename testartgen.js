@@ -12,5 +12,3 @@ const generateArt = require('./services/createart');
     console.error('💥 Error during test:', err.message);
   }
 })();
-
-
