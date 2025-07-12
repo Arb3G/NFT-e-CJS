@@ -18,10 +18,10 @@ const tryCraiyon = async (prompt) => {
     await page.goto('https://www.craiyon.com/', { waitUntil: 'domcontentloaded' });
     console.log('Craiyon page loaded');
 
-    // Wait for and click into the prompt field manually using coordinates
-    await page.waitForTimeout(4000); // Wait for React to finish rendering
+    // Wait manually using setTimeout fallback
+    await new Promise(resolve => setTimeout(resolve, 4000));
 
-    // Click the center of the page (where the input is located visually)
+    // Click approximately where the prompt box is located
     await page.mouse.click(600, 300);
     await page.keyboard.type(prompt);
 
@@ -39,6 +39,21 @@ const tryCraiyon = async (prompt) => {
       'img[src^="data:image/jpeg;base64,"]',
       (img) => img.src
     );
+
+    const buffer = Buffer.from(base64Image.split(',')[1], 'base64');
+
+    await browser.close();
+    console.log('✅ Craiyon image retrieved');
+    return buffer;
+  } catch (err) {
+    console.warn('[Craiyon failed]', err.message);
+    await page.screenshot({ path: 'craiyon_debug.png' });
+    console.log('📸 Saved debug screenshot as craiyon_debug.png');
+    await browser.close();
+    throw err;
+  }
+};
+
 
     const buffer = Buffer.from(base64Image.split(',')[1], 'base64');
 
