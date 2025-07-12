@@ -1,5 +1,7 @@
 const puppeteer = require('puppeteer');
 const fetch = require('node-fetch'); // Make sure this is installed: npm i node-fetch
+const open = require('open');
+
 //require('dotenv').config();
 
 const tryCraiyon = async (prompt) => {
@@ -69,7 +71,9 @@ const tryHuggingFace = async (prompt) => {
     }
 
     const buffer = Buffer.from(await response.arrayBuffer());
+    await open(buffer);
     return buffer;
+    
   } catch (err) {
     console.warn('[Hugging Face failed]', err.message);
     throw err;
@@ -86,3 +90,5 @@ const generateArt = async (prompt) => {
 };
 
 module.exports = generateArt;
+
+
