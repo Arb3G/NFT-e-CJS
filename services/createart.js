@@ -8,18 +8,29 @@ const fs = require('fs');
 const tryCraiyon = async (prompt) => {
   const browser = await puppeteer.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: ['--no-sandbox', 
+           '--disable-setuid-sandbox',
+           '--disable-gpu',  // Add this flag to improve performance in some environments
+           '--disable-software-rasterizer'],
   });
   const page = await browser.newPage();
 
   try {
+    console.log('Starting Craiyon...');
     await page.goto('https://www.craiyon.com/', { waitUntil: 'networkidle2' });
+    console.log('Craiyon page loaded');
 
+    console.log('Typing prompt:', prompt);
     await page.type('textarea', prompt);
-    await page.click('button:has-text("Draw")');
 
-    await page.waitForSelector('img[src^="data:image/jpeg;base64,"]', {
-      timeout: 60000,
+    console.log('Clicking Draw...');
+    await page.click('button:has-text("Draw")');
+    console.log('Draw button clicked');
+
+    console.log('Waiting for image...');
+    await page.waitForSelector('img[src^="data:image/jpeg;base64,"]', { timeout: 60000 });
+    console.log('Image found');
+        
     });
 
     const base64Image = await page.$eval(
@@ -98,9 +109,15 @@ const tryHuggingFace = async (prompt) => {
 const generateArt = async (prompt) => {
   try {
     return await tryCraiyon(prompt);
-  } catch {
-    console.log('⚠️ Falling back to Hugging Face...');
-    return await tryHuggingFace(prompt);
+  } catch (err) {
+    console.log('⚠️ Craiyon failed:', err.message);
+    try {
+      console.log('⚠️ Falling back to Hugging Face...');
+      return await tryHuggingFace(prompt);
+    } catch (err) {
+      console.log('⚠️ Hugging Face failed:', err.message);
+      throw new Error('Both Craiyon and Hugging Face failed');
+    }
   }
 };
 
