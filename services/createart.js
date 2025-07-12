@@ -1,6 +1,6 @@
 const puppeteer = require('puppeteer');
 const fetch = require('node-fetch'); // Make sure this is installed: npm i node-fetch
-const open = require('open');
+//const open = require('open');
 
 //require('dotenv').config();
 
@@ -71,7 +71,11 @@ const tryHuggingFace = async (prompt) => {
     }
 
     const buffer = Buffer.from(await response.arrayBuffer());
-    await open(buffer);
+    //await open(buffer);
+    fs.writeFileSync('testoutput.png', buffer);
+    console.log('✅ Image saved as testoutput.png');
+     // 👇 This will auto-open in browser (if supported)
+    await open('testoutput.png');
     return buffer;
     
   } catch (err) {
