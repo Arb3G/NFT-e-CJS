@@ -1,11 +1,11 @@
 const puppeteer = require('puppeteer');
-const axios = require('axios');
+const fetch = require('node-fetch'); // Make sure this is installed: npm i node-fetch
 //require('dotenv').config();
 
 const tryCraiyon = async (prompt) => {
   const browser = await puppeteer.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
   const page = await browser.newPage();
 
@@ -16,10 +16,13 @@ const tryCraiyon = async (prompt) => {
     await page.click('button:has-text("Draw")');
 
     await page.waitForSelector('img[src^="data:image/jpeg;base64,"]', {
-      timeout: 60000
+      timeout: 60000,
     });
 
-    const base64Image = await page.$eval('img[src^="data:image/jpeg;base64,"]', img => img.src);
+    const base64Image = await page.$eval(
+      'img[src^="data:image/jpeg;base64,"]',
+      (img) => img.src
+    );
     const buffer = Buffer.from(base64Image.split(',')[1], 'base64');
 
     await browser.close();
@@ -34,23 +37,35 @@ const tryCraiyon = async (prompt) => {
 const tryHuggingFace = async (prompt) => {
   const HF_TOKEN = process.env.HF_TOKEN;
   const model = 'stabilityai/stable-diffusion-2';
+  const url = 'https://router.huggingface.co/hyperbolic/v1/images/generations';
+
+  if (!HF_TOKEN) {
+    console.error('❌ Missing Hugging Face token. Set HF_TOKEN in .env or CLI.');
+    throw new Error('HF_TOKEN not set');
+  }
 
   try {
-    const response = await axios.post(
-      `https://api-inference.huggingface.co/${model}`,
-      { inputs: prompt },
-      {
-        headers: {
-          Authorization: `Bearer ${HF_TOKEN}`
-        },
-        responseType: 'arraybuffer',
-        timeout: 90000
-      }
-    );
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${HF_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt: prompt,
+        model_name: model,
+      }),
+    });
 
-    return Buffer.from(response.data, 'binary');
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`API Error: ${response.status} - ${error}`);
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return buffer;
   } catch (err) {
-    console.warn('[Hugging Face failed]', err.response?.data || err.message);
+    console.warn('[Hugging Face failed]', err.message);
     throw err;
   }
 };
@@ -59,7 +74,7 @@ const generateArt = async (prompt) => {
   try {
     return await tryCraiyon(prompt);
   } catch {
-    console.log('Falling back to Hugging Face...');
+    console.log('⚠️ Falling back to Hugging Face...');
     return await tryHuggingFace(prompt);
   }
 };
