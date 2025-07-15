@@ -86,7 +86,8 @@ async function runBingImageBot(prompt, cookieFilePath) {
     // **** selector verbiage to search for the Create button on bing****
     await page.waitForSelector('#create_btn_c', { timeout: 10000 });  
     await page.click('#create_btn_c');
-
+    await sleep(5000); // per chatcom You might want to add a small wait after clicking "Create" to give it a moment before waiting for images:
+    
     console.log('🖱️ Clicked the "Create" button.');
   } catch (clickErr) {
     console.error('❌ Could not find or click the "Create" button:', clickErr.message);
