@@ -59,7 +59,10 @@ async function loadCookies(page, cookiePath) {
 
 // Main bot to generate images on Bing using a prompt
 async function runBingImageBot(prompt, cookieFilePath) {
-  const browser = await puppeteer.launch({ headless: true });
+  const browser = await puppeteer.launch({
+  headless: 'new',
+  args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
   const page = await browser.newPage();
 
   await page.setViewport(getRandomViewport());
