@@ -73,7 +73,7 @@ async function runBingImageBot(prompt, cookieFilePath) {
   // Navigate to Bing Image Creator
   await page.goto('https://www.bing.com/images/create', { waitUntil: 'networkidle2' });
 
-  // Simulate human pause
+  // Simulate human pause before interacting
   await sleep(getRandomPause());
 
   // Type prompt like a human
@@ -83,11 +83,13 @@ async function runBingImageBot(prompt, cookieFilePath) {
 
   // Try to find and click the "Create" button
   try {
-    // **** selector verbiage to search for the Create button on bing****
-    await page.waitForSelector('#create_btn_c', { timeout: 10000 });  
+    // Wait for and click the "Create" button
+    await page.waitForSelector('#create_btn_c', { timeout: 10000 });
     await page.click('#create_btn_c');
-    await sleep(5000); // per chatcom You might want to add a small wait after clicking "Create" to give it a moment before waiting for images:
-    
+
+    // Add small wait to let post-click scripts engage
+    await sleep(5000);
+
     console.log('🖱️ Clicked the "Create" button.');
   } catch (clickErr) {
     console.error('❌ Could not find or click the "Create" button:', clickErr.message);
@@ -101,17 +103,58 @@ async function runBingImageBot(prompt, cookieFilePath) {
     return;
   }
 
-  // Wait for generated image results
+  // Wait for either image results or a known error screen
   try {
-    //await page.waitForSelector('.image-result-container', { timeout: 30000 });
-    await page.waitForSelector('#gil_img_results .img_cont img', { timeout: 60000 });
-    console.log('✅ Images generated successfully!');
-  } catch {
-    console.warn('⚠️ Timeout waiting for image results.');
+    await Promise.race([
+      // Image result thumbnail selector
+      page.waitForSelector('#gil_img_results .img_cont img', { timeout: 60000 }),
+      // Catch common Bing error panels if image generation fails
+      page.waitForSelector('#gilen_son, #gilen_stsqn, #gilen_crns, #gilen_cnectr', { timeout: 60000 }),
+    ]);
+  } catch (err) {
+    console.warn('⚠️ Timeout waiting for any post-create response.');
   }
 
-  // Screenshot the final page
-  await page.screenshot({ path: 'bing-image-results.png', fullPage: true });
+  // Determine what happened: success, failure banner, or unknown state
+  const resultExists = await page.$('#gil_img_results .img_cont img');
+  const errorBanner = await page.evaluate(() => {
+    const banners = [
+      '#gilen_son',
+      '#gilen_stsqn',
+      '#gilen_crns',
+      '#gilen_cnectr'
+    ];
+    for (let sel of banners) {
+      const el = document.querySelector(sel);
+      if (el && el.innerText) return el.innerText;
+    }
+    return null;
+  });
+
+  // ✅ Success
+  if (resultExists) {
+    console.log('✅ Images generated successfully!');
+    await page.screenshot({ path: 'bing-image-results.png', fullPage: true });
+
+  // ❌ Known Bing error banners (rate limit, region restriction, etc.)
+  } else if (errorBanner) {
+    console.warn('❌ Bing returned an error banner:', errorBanner);
+
+  // ⚠️ Unknown state — neither image results nor error message
+  } else {
+    console.warn('⚠️ No image results or error banners found — unknown state.');
+
+    // Save page HTML for inspection
+    const html = await page.content();
+    await fs.writeFile('bing-debug.html', html);
+
+    // Save full page screenshot
+    await page.screenshot({ path: 'bing-timeout.png', fullPage: true });
+
+    // Log partial page text to console
+    const text = await page.evaluate(() => document.body.innerText);
+    console.log('🔎 Partial visible page text:\n', text.slice(0, 1000));
+  }
 
   await browser.close();
 }
