@@ -25,7 +25,7 @@ function getRandomViewport() {
   };
 }
 
-// Load manual cookies (just _U and KievRPSSecAuth) from a JSON file
+// Load manual cookies (_U and KievRPSSecAuth only)
 async function loadCookies(page, cookiePath) {
   try {
     const cookieData = await fs.readFile(cookiePath, 'utf8');
@@ -57,34 +57,48 @@ async function loadCookies(page, cookiePath) {
   }
 }
 
-// Main bot to generate images on Bing using a prompt
+// Main Bing image bot function
 async function runBingImageBot(prompt, cookieFilePath) {
   const browser = await puppeteer.launch({
-  headless: 'new',
-  args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
-  const page = await browser.newPage();
 
+  const page = await browser.newPage();
   await page.setViewport(getRandomViewport());
 
-  // Inject session cookies
+  // Load cookies before navigating to Bing
   await loadCookies(page, cookieFilePath);
 
-  // Go to Bing Image Creator
+  // Navigate to Bing Image Creator
   await page.goto('https://www.bing.com/images/create', { waitUntil: 'networkidle2' });
 
-  // Wait a moment before typing
+  // Simulate human pause
   await sleep(getRandomPause());
 
-  // Type prompt into the input field
+  // Type prompt like a human
   await page.type('textarea[name="q"]', prompt, { delay: getRandomTypingDelay() });
 
   await sleep(getRandomPause());
 
-  // Click the generate button
-  await page.click('button[type="submit"]');
+  // Try to find and click the "Create" button
+  try {
+    await page.waitForSelector('button:has-text("Create")', { timeout: 10000 });
+    await page.click('button:has-text("Create")');
+    console.log('🖱️ Clicked the "Create" button.');
+  } catch (clickErr) {
+    console.error('❌ Could not find or click the "Create" button:', clickErr.message);
 
-  // Wait for images to load or timeout
+    // Dump page HTML for debugging
+    const html = await page.content();
+    await fs.writeFile('bing-debug.html', html);
+    console.log('📄 Saved page HTML to bing-debug.html for inspection.');
+
+    await browser.close();
+    return;
+  }
+
+  // Wait for generated image results
   try {
     await page.waitForSelector('.image-result-container', { timeout: 30000 });
     console.log('✅ Images generated successfully!');
@@ -92,7 +106,7 @@ async function runBingImageBot(prompt, cookieFilePath) {
     console.warn('⚠️ Timeout waiting for image results.');
   }
 
-  // Screenshot result page
+  // Screenshot the final page
   await page.screenshot({ path: 'bing-image-results.png', fullPage: true });
 
   await browser.close();
@@ -100,6 +114,6 @@ async function runBingImageBot(prompt, cookieFilePath) {
 
 // Example usage
 const prompt = 'A cyberpunk city skyline at night, highly detailed, futuristic';
-const cookieFilePath = path.resolve(__dirname, 'cookies.json'); // Manual cookies file
+const cookieFilePath = path.resolve(__dirname, 'cookies.json'); // JSON with _U and KievRPSSecAuth
 
 runBingImageBot(prompt, cookieFilePath).catch(console.error);
