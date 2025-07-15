@@ -1,9 +1,9 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-puppeteer.use(StealthPlugin());
-
 const fs = require('fs').promises;
 const path = require('path');
+
+puppeteer.use(StealthPlugin());
 
 // Sleep helper
 function sleep(ms) {
@@ -24,7 +24,7 @@ function getRandomPause() {
 function getRandomViewport() {
   return {
     width: 1200 + Math.floor(Math.random() * 200),
-    height: 700 + Math.floor(Math.random() * 200)
+    height: 700 + Math.floor(Math.random() * 200),
   };
 }
 
@@ -50,7 +50,7 @@ async function loadCookies(page, cookiePath) {
         path: '/',
         httpOnly: true,
         secure: true,
-      }
+      },
     ];
 
     await page.setCookie(...cookies);
@@ -63,37 +63,29 @@ async function loadCookies(page, cookiePath) {
 // Main Bing image bot function
 async function runBingImageBot(prompt, cookieFilePath) {
   const browser = await puppeteer.launch({
-    headless: false, // ← try headful mode for realism
+    headless: true, // Stick to true for Codespaces/Replit
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
 
   const page = await browser.newPage();
   await page.setViewport(getRandomViewport());
 
-  // Load cookies before navigating to Bing
   await loadCookies(page, cookieFilePath);
 
-  // Navigate to Bing Image Creator
-  await page.goto('https://www.bing.com/images/create', { waitUntil: 'networkidle2' });
-
-  // Simulate human pause
-  await sleep(getRandomPause());
-
-  // Type prompt like a human
-  await page.type('textarea[name="q"]', prompt, { delay: getRandomTypingDelay() });
+  await page.goto('https://www.bing.com/images/create', { waitUntil: 'domcontentloaded' });
 
   await sleep(getRandomPause());
 
-  // Try to find and click the "Create" button
   try {
+    await page.type('textarea[name="q"]', prompt, { delay: getRandomTypingDelay() });
+    await sleep(getRandomPause());
+
     await page.waitForSelector('#create_btn_c', { timeout: 10000 });
     await page.click('#create_btn_c');
-    await sleep(5000); // small buffer after clicking
+    await sleep(5000);
     console.log('🖱️ Clicked the "Create" button.');
   } catch (clickErr) {
     console.error('❌ Could not find or click the "Create" button:', clickErr.message);
-
-    // Dump page HTML for debugging
     const html = await page.content();
     await fs.writeFile('bing-debug.html', html);
     console.log('📄 Saved page HTML to bing-debug.html for inspection.');
@@ -101,27 +93,30 @@ async function runBingImageBot(prompt, cookieFilePath) {
     return;
   }
 
-  // Wait for generated image results
+  // Wait for image results
   try {
     await page.waitForSelector('#gil_img_results .img_cont img', { timeout: 60000 });
     console.log('✅ Images generated successfully!');
   } catch {
-    // Check if error banner appeared
-    const errorBanner = await page.$eval('#gilen_son .gilen_t1', el => el.textContent).catch(() => null);
-    if (errorBanner) {
-      console.warn(`❌ Bing returned an error banner: ${errorBanner}`);
+    // Check for common Bing errors
+    const errorText = await page.evaluate(() => {
+      const err = document.querySelector('.gilen_t1');
+      return err ? err.textContent : null;
+    });
+
+    if (errorText) {
+      console.warn('❌ Bing returned an error banner:', errorText);
     } else {
       console.warn('⚠️ Timeout waiting for image results.');
     }
   }
 
-  // Screenshot the final page
   await page.screenshot({ path: 'bing-image-results.png', fullPage: true });
   await browser.close();
 }
 
 // Example usage
 const prompt = 'A cyberpunk city skyline at night, highly detailed, futuristic';
-const cookieFilePath = path.resolve(__dirname, 'cookies.json'); // JSON with _U and KievRPSSecAuth
+const cookieFilePath = path.resolve(__dirname, 'cookies.json');
 
 runBingImageBot(prompt, cookieFilePath).catch(console.error);
