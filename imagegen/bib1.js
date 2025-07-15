@@ -103,7 +103,8 @@ async function runBingImageBot(prompt, cookieFilePath) {
 
   // Wait for generated image results
   try {
-    await page.waitForSelector('.image-result-container', { timeout: 30000 });
+    //await page.waitForSelector('.image-result-container', { timeout: 30000 });
+    await page.waitForSelector('#gil_img_results .img_cont img', { timeout: 60000 });
     console.log('✅ Images generated successfully!');
   } catch {
     console.warn('⚠️ Timeout waiting for image results.');
