@@ -83,8 +83,10 @@ async function runBingImageBot(prompt, cookieFilePath) {
 
   // Try to find and click the "Create" button
   try {
-    await page.waitForSelector('button:has-text("Create")', { timeout: 10000 });
-    await page.click('button:has-text("Create")');
+    // **** selector verbiage to search for the Create button on bing****
+    await page.waitForSelector('#create_btn_c', { timeout: 10000 });  
+    await page.click('#create_btn_c');
+
     console.log('🖱️ Clicked the "Create" button.');
   } catch (clickErr) {
     console.error('❌ Could not find or click the "Create" button:', clickErr.message);
