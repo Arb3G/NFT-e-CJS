@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer-extra');
+const puppeteer = require('puppeteer-extra'); // Using puppeteer-extra for stealth plugin
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const fs = require('fs').promises;
 const path = require('path');
@@ -24,7 +24,7 @@ function getRandomPause() {
 function getRandomViewport() {
   return {
     width: 1200 + Math.floor(Math.random() * 200),
-    height: 700 + Math.floor(Math.random() * 200),
+    height: 700 + Math.floor(Math.random() * 200)
   };
 }
 
@@ -50,7 +50,7 @@ async function loadCookies(page, cookiePath) {
         path: '/',
         httpOnly: true,
         secure: true,
-      },
+      }
     ];
 
     await page.setCookie(...cookies);
@@ -63,60 +63,75 @@ async function loadCookies(page, cookiePath) {
 // Main Bing image bot function
 async function runBingImageBot(prompt, cookieFilePath) {
   const browser = await puppeteer.launch({
-    headless: true, // Stick to true for Codespaces/Replit
+    headless: true, // headless mode with stealth plugin
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
 
   const page = await browser.newPage();
   await page.setViewport(getRandomViewport());
 
+  // Load cookies before navigating to Bing
   await loadCookies(page, cookieFilePath);
 
-  await page.goto('https://www.bing.com/images/create', { waitUntil: 'domcontentloaded' });
+  // Navigate to Bing Image Creator
+  await page.goto('https://www.bing.com/images/create', { waitUntil: 'networkidle2' });
+
+  // Simulate human pause
+  await sleep(getRandomPause());
+
+  // Type prompt like a human
+  await page.type('textarea[name="q"]', prompt, { delay: getRandomTypingDelay() });
 
   await sleep(getRandomPause());
 
+  // Try to find and click the "Create" button
   try {
-    await page.type('textarea[name="q"]', prompt, { delay: getRandomTypingDelay() });
-    await sleep(getRandomPause());
-
-    await page.waitForSelector('#create_btn_c', { timeout: 10000 });
+    await page.waitForSelector('#create_btn_c', { timeout: 10000 });  
     await page.click('#create_btn_c');
-    await sleep(5000);
+    await sleep(5000); // wait for Bing to respond
+
+    // Check for error banners about usage or boosts
+    const errorBanner = await page.$('.gilen_tc .gilen_t2'); // banner message selector
+
+    if (errorBanner) {
+      const errorMessage = await page.evaluate(el => el.textContent, errorBanner);
+      if (/boost|usage|high volume|unable to create/i.test(errorMessage)) {
+        console.warn(`❌ Bing returned an error banner: ${errorMessage.trim()}`);
+        await page.screenshot({ path: 'bing-error-banner.png' });
+        await browser.close();
+        return;
+      }
+    }
+
     console.log('🖱️ Clicked the "Create" button.');
   } catch (clickErr) {
     console.error('❌ Could not find or click the "Create" button:', clickErr.message);
+
+    // Dump page HTML for debugging
     const html = await page.content();
     await fs.writeFile('bing-debug.html', html);
     console.log('📄 Saved page HTML to bing-debug.html for inspection.');
+
     await browser.close();
     return;
   }
 
-  // Wait for image results
+  // Wait for generated image results
   try {
     await page.waitForSelector('#gil_img_results .img_cont img', { timeout: 60000 });
     console.log('✅ Images generated successfully!');
   } catch {
-    // Check for common Bing errors
-    const errorText = await page.evaluate(() => {
-      const err = document.querySelector('.gilen_t1');
-      return err ? err.textContent : null;
-    });
-
-    if (errorText) {
-      console.warn('❌ Bing returned an error banner:', errorText);
-    } else {
-      console.warn('⚠️ Timeout waiting for image results.');
-    }
+    console.warn('⚠️ Timeout waiting for image results.');
   }
 
+  // Screenshot the final page
   await page.screenshot({ path: 'bing-image-results.png', fullPage: true });
+
   await browser.close();
 }
 
 // Example usage
 const prompt = 'A cyberpunk city skyline at night, highly detailed, futuristic';
-const cookieFilePath = path.resolve(__dirname, 'cookies.json');
+const cookieFilePath = path.resolve(__dirname, 'cookies.json'); // JSON file with _U and KievRPSSecAuth cookies
 
 runBingImageBot(prompt, cookieFilePath).catch(console.error);
